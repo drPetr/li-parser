@@ -1,2 +1,2 @@
 all:
-	gcc main.c li.c -oapp -Wall -std=c11
+	gcc main.c li.c -oapp -std=c11 -Wall -Wno-unused-variable -Wno-unused-function -DDEBUG 
