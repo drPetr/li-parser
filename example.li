@@ -1,0 +1,203 @@
+keybingidg = {
+    a_null = null
+	group = {
+        name = "kb_grp_direction"
+        command = 
+            { id = "kb_left" exe = "left" },
+            { id = "kb_right" exe="right" },
+            { id = "kb_up" exe = "up" },
+            { id = "kb_down" exe="down" }
+    }, {
+        name = "kb_grp_movement"
+        command = 
+            { id = "kb_forward" exe = "left" },
+            { id = "kb_backward" exe = "back" },
+            { id = "kb_left_strafe" exe = "lstrafe" },
+            { id = "kb_right_strafe" exe = "rstrafe" },
+            { id = "kb_jump" exe = "jump" },
+            { id = "kb_crouch" exe = "crouch" },
+            { id = "kb_crouch_toggle" exe = "crouch_toggle" },
+            { id = "kb_always_run" exe = "accel" },
+            { id = "kb_sprint" exe = "sprint_toggle" },
+            { id = "kb_left_lookout" exe = "llookout" },
+            { id = "kb_right_lookout" exe = "rlookout" }
+    }, {
+        name = "kb_grp_weapons"
+        command =
+            { id = "kb_weapon1" exe = "wpn_1" },
+            { id = "kb_weapon2" exe = "wpn_2" },
+            { id = "kb_weapon3" exe = "wpn_3" },
+            { id = "kb_weapon4" exe = "wpn_4" },
+            { id = "kb_weapon5" exe = "wpn_5" },
+            { id = "kb_weapon6" exe = "wpn_6" },
+            { id = "kb_wpn_next" exe = "wpn_next" },
+            { id = "kb_next_slot" exe = "next_slot" },
+            { id = "kb_prev_slot" exe = "prev_slot" },
+            { id = "kb_fire" exe = "wpn_fire" },
+            { id = "kb_zoom" exe = "wpn_zoom" },
+            { id = "kb_reload" exe = "wpn_reload" },
+            { id = "kb_func" exe = "wpn_func" },
+            { id = "kb_firemode_next" exe = "wpn_firemode_next" },
+            { id = "kb_firemode_prev" exe = "wpn_firemode_prev" }
+    }, {
+        name = "kb_grp_inventory"
+        command =
+            { id = "kb_inventory" exe = "inventory" },
+            { id = "kb_active_jobs" exe = "active_jobs" },
+            { id = "kb_map" exe = "map" },
+            { id = "kb_contacts" exe = "contacts" },
+            { id = "kb_torch" exe = "torch" },
+            { id = "kb_night_vision" exe = "night_vision" },
+            { id = "kb_use_bandage" exe = "use_bandage" },
+            { id = "kb_use_medkit" exe = "use_medkit" },
+            { id = "kb_drop" exe = "drop" },
+            { id = "kb_turn_engine" exe = "turn_engine" }
+    }, {
+        name = "kb_grp_common"
+        command =
+            { id = "kb_pause" exe = "pause" },
+            { id = "kb_use" exe = "use" },
+            { id = "kb_screenshot" exe = "screenshot" },
+            { id = "kb_quit" exe = "quit" },
+            { id = "kb_console" exe = "console" },
+            { id = "ui_mm_save_game" exe = "quick_save" },
+            { id = "ui_mm_load_game" exe = "quick_load" },
+            { id = "kb_cam_1" exe = "cam_1" },
+            { id = "kb_cam_2" exe = "cam_2" },
+            { id = "kb_cam_3" exe = "cam_3" } 
+    }, {
+        name = "kb_grp_multiplayer"
+        command =
+            { id = "kb_artefact" exe = "artefact" },
+            { id = "kb_scores" exe = "scores" },
+            { id = "kb_chat" exe = "chat" },
+            { id = "kb_chat_team" exe = "chat_team" },
+            { id = "kb_buy_menu" exe = "buy_menu" },
+            { id = "kb_skin_menu" exe = "skin_menu" },
+            { id = "kb_team_menu" exe = "team_menu" },
+            { id = "kb_vote_begin" exe = "vote_begin" },
+            { id = "kb_vote_menu" exe = "vote" },
+            { id = "kb_vote_yes" exe = "vote_yes" },
+            { id = "kb_vote_no" exe = "vote_no" },
+            { id = "speech_menu_group" exe = "speech_menu_0" },
+            { id = "speech_menu_personal" exe = "speech_menu_1" }
+    }
+}
+
+keybingidg[a_null,group[name,command[id,exe]]] = {
+    null
+	{
+        "kb_grp_direction"
+        {"kb_left" "left"},
+        {"kb_right" "right"},
+        {"kb_up" "up"},
+        {"kb_down" "down"}
+    }, {
+        "kb_grp_movement"
+        {"kb_forward" "left"},
+        {"kb_backward" "back"},
+        {"kb_left_strafe" "lstrafe"},
+        {"kb_right_strafe" "rstrafe"},
+        {"kb_jump" "jump"},
+        {"kb_crouch" "crouch"},
+        {"kb_crouch_toggle" "crouch_toggle"},
+        {"kb_always_run" "accel"},
+        {"kb_sprint" "sprint_toggle"},
+        {"kb_left_lookout" "llookout"},
+        {"kb_right_lookout" "rlookout"}
+    }, {
+        "kb_grp_weapons"
+        {"kb_weapon1" "wpn_1"},
+        {"kb_weapon2" "wpn_2"},
+        {"kb_weapon3" "wpn_3"},
+        {"kb_weapon4" "wpn_4"},
+        {"kb_weapon5" "wpn_5"},
+        {"kb_weapon6" "wpn_6"},
+        {"kb_wpn_next" "wpn_next"},
+        {"kb_next_slot" "next_slot"},
+        {"kb_prev_slot" "prev_slot"},
+        {"kb_fire" "wpn_fire"},
+        {"kb_zoom" "wpn_zoom"},
+        {"kb_reload" "wpn_reload"},
+        {"kb_func" "wpn_func"},
+        {"kb_firemode_next" "wpn_firemode_next"},
+        {"kb_firemode_prev" "wpn_firemode_prev"}
+    }, {
+        "kb_grp_inventory"
+        {"kb_inventory" "inventory"},
+        {"kb_active_jobs" "active_jobs"},
+        {"kb_map" "map"},
+        {"kb_contacts" "contacts"},
+        {"kb_torch" "torch"},
+        {"kb_night_vision" "night_vision"},
+        {"kb_use_bandage" "use_bandage"},
+        {"kb_use_medkit" "use_medkit"},
+        {"kb_drop" "drop"},
+        {"kb_turn_engine" "turn_engine"}
+    }, {
+        "kb_grp_common"
+        {"kb_pause" "pause"},
+        {"kb_use" "use"},
+        {"kb_screenshot" "screenshot"},
+        {"kb_quit" "quit"},
+        {"kb_console" "console"},
+        {"ui_mm_save_game" "quick_save"},
+        {"ui_mm_load_game" "quick_load"},
+        {"kb_cam_1" "cam_1"},
+        {"kb_cam_2" "cam_2"},
+        {"kb_cam_3" "cam_3"} 
+    }, {
+        "kb_grp_multiplayer"
+        {"kb_artefact" "artefact"},
+        {"kb_scores" "scores"},
+        {"kb_chat" "chat"},
+        {"kb_chat_team" "chat_team"},
+        {"kb_buy_menu" "buy_menu"},
+        {"kb_skin_menu" "skin_menu"},
+        {"kb_team_menu" "team_menu"},
+        {"kb_vote_begin" "vote_begin"},
+        {"kb_vote_menu" "vote"},
+        {"kb_vote_yes" "vote_yes"},
+        {"kb_vote_no" "vote_no"},
+        {"speech_menu_group" "speech_menu_0"},
+        {"speech_menu_personal" "speech_menu_1"}
+    }
+}
+
+
+
+
+json = {
+    squadName = "Super hero squad"
+    homeTown = "Metro City"
+    formed = 2016
+    secretBase = "Super tower"
+    active = true
+    members = {
+        name = "Molecule Man"
+        age = 29
+        secretIdentity = "Dan Jukes"
+        powers = 
+            "Radiation resistance",
+            "Turning tiny",
+            "Radiation blast"
+    }, {
+        name = "Madame Uppercut"
+        age = 39
+        secretIdentity = "Jane Wilson",
+        powers = 
+            "Million tonne punch", 
+            "Damage resistance", 
+            "Superhuman reflexes"
+    }, {
+        name = "Eternal Flame"
+        age = 1000000
+        secretIdentity = "Unknown"
+        powers = 
+            "Immortality", 
+            "Heat Immunity", 
+            "Inferno", 
+            "Teleportation",
+            "Interdimensional travel"
+    }
+}
