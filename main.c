@@ -217,7 +217,7 @@ int main( int argc, char **argv ) {
     
     
     
-    li_write( NULL, li, "out.li", 0 );
+    li_write( NULL, li, "out/out.li", 0 );
     
     li_free( li );
     
