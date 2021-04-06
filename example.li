@@ -4,13 +4,13 @@ keybingidg = {
         name = "kb_grp_direction"
         command = 
             { id = "kb_left" exe = "left" },
-            { id = "kb_right" exe="right" },
+            { id = "kb_right" exe = "right" },
             { id = "kb_up" exe = "up" },
             { id = "kb_down" exe="down" }
     }, {
         name = "kb_grp_movement"
         command = 
-            { id = "kb_forward" exe = "left" },
+            { id = "kb_forward" exe = "forward" },
             { id = "kb_backward" exe = "back" },
             { id = "kb_left_strafe" exe = "lstrafe" },
             { id = "kb_right_strafe" exe = "rstrafe" },
@@ -94,7 +94,7 @@ keybingidg[a_null,group[name,command[id,exe]]] = {
         {"kb_down" "down"}
     }, {
         "kb_grp_movement"
-        {"kb_forward" "left"},
+        {"kb_forward" "forward"},
         {"kb_backward" "back"},
         {"kb_left_strafe" "lstrafe"},
         {"kb_right_strafe" "rstrafe"},
