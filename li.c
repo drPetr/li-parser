@@ -344,6 +344,9 @@ liStr_t *LiStrRealloc( liStr_t *s, uint32_t siz ) {
     liassert( siz >= 1 );
     
     siz = CeilPow2( siz );
+    if( s->alloced == siz ) {
+        return s;
+    }
     s = LiRealloc( s, sizeof(liStr_t) + siz, LI_TYID_STR );
     s->alloced = siz;
     if( s->len >= siz ) {
@@ -436,6 +439,37 @@ void LiStrConcatCstr( liStr_t **s, const char *cstr ) {
     LiStrConcat( s, cstr, (uint32_t)strlen(cstr) );
 }
 
+/*
+============
+LiStrSet
+============
+*/
+void LiStrSet( liStr_t **s, const char *cstr, uint32_t len ) {
+    liassert( cstr );
+    liassert( s );
+    
+    if( *s == NULL ) {
+        *s = LiStrAlloc( len );
+    } else {
+        *s = LiStrRealloc( *s, len );
+    }
+     /* copy string */
+    memcpy( (*s)->str, cstr, len );
+    (*s)->len = len;
+    (*s)->str[len] = 0;
+}
+
+/*
+============
+LiStrSetCstr
+============
+*/
+void LiStrSetCstr( liStr_t **s, const char *cstr ) {
+    liassert( cstr );
+    liassert( s );
+    
+    LiStrSet( s, cstr, (uint32_t)strlen(cstr) );
+}
 
 
 /*
@@ -451,7 +485,6 @@ LiValInit
 */
 void LiValInit( liVal_t *val, litype_t type ) {
     liassert( val );
-    
     val->vstr = NULL;
     val->type = type;
     val->flags = 0;
@@ -459,10 +492,10 @@ void LiValInit( liVal_t *val, litype_t type ) {
 
 /*
 ============
-LiValInitStr
+LiValInitLiStr
 ============
 */
-void LiValInitStr( liVal_t *val, liStr_t *s ) {
+void LiValInitLiStr( liVal_t *val, liStr_t *s ) {
     liassert( val );
     
     LiValInit( val, LI_TSTR );
@@ -553,6 +586,35 @@ void LiValArrayFree( liValArray_t *array ) {
     }
     LiDealloc( array );
 }
+
+/*
+============
+LiValArrayAppendEmpty
+============
+*/
+liVal_t *LiValArrayAppendEmpty( liValArray_t **array ) {
+    liassert( array );
+    
+    /* check if array not exists */
+    if( !*array ) {
+        /* array not exist */
+        /* create a new array and allocate memory for one element */
+        *array = LiValArrayAlloc( 1 );
+    } else if( (*array)->arrayNumber == (*array)->arrayMaxNumber ) {
+        /* array exists */
+        /* reallocate memory for additional element */
+        uint32_t num = (*array)->arrayNumber;
+        (*array) = LiValArrayRealloc( (*array), num + 1 );
+    }
+    /* initialize value as null */
+    liVal_t *v = &((*array)->array[(*array)->arrayNumber++]);
+    LiValInit( v, LI_TNULL );
+    
+    return v;
+}
+
+
+    
 
 
 
@@ -846,7 +908,7 @@ liNode_t *LiNodeCreate( void ) {
     node->prev = NULL;
     node->firstChild = NULL;
     node->lastChild = NULL;
-    node->id = NULL;
+    node->key = NULL;
     node->innerCom = NULL;
     node->afterCom = NULL;
     node->values = NULL;
@@ -918,12 +980,48 @@ void LiFree( liNode_t *li ) {
 LiObjCreate
 ============
 */
-liNode_t *LiObjCreate( const char *id, uint32_t len ) {
+liNode_t *LiObjCreate( void ) {
+    return LiNodeCreate();
+}
+
+/*
+============
+LiObjSetKeyStr
+============
+*/
+void LiObjSetKeyStr( liNode_t *o, const char *s, uint32_t len ) {
+    liassert( o );
+    
+    if( !s ) {
+        if( o->key ) {
+            LiStrFree( o->key );
+            o->key = NULL;
+        }
+    } else {
+        LiStrSet( &(o->key), s, len );
+    }
+}
+
+/*
+============
+LiObjSetKeyCstr
+============
+*/
+void LiObjSetKeyCstr( liNode_t *o, const char *s ) {
+    liassert( o );
+    LiObjSetKeyStr( o, s, (uint32_t)strlen(s) );
+}
+
+/*
+============
+LiObjCreateStr
+============
+*/
+liNode_t *LiObjCreateStr( const char *key, uint32_t len ) {
     liNode_t *node;
     
     node = LiNodeCreate();
-    node->id = LiStrCreate( id, len );
-    
+    node->key = LiStrCreate( key, len );
     
     return node;
 }
@@ -933,8 +1031,8 @@ liNode_t *LiObjCreate( const char *id, uint32_t len ) {
 LiObjCreateCstr
 ============
 */
-liNode_t *LiObjCreateCstr( const char *id ) {
-    return LiObjCreate( id, (uint32_t)strlen(id) );
+liNode_t *LiObjCreateCstr( const char *key ) {
+    return LiObjCreateStr( key, (uint32_t)strlen(key) );
 }
 
 /*
@@ -972,7 +1070,6 @@ LiObjAppendAfterCom
 void LiObjAppendAfterCom( liNode_t *o, const char *com, uint32_t len ) {
     liassert( o );
     liassert( com );
-    
     if( o->afterCom ) {
         LiStrConcat( &(o->afterCom), com, len );
     } else {
@@ -989,6 +1086,42 @@ void LiObjAppendAfterComCstr( liNode_t *o, const char *com ) {
     liassert( o );
     liassert( com );
     LiObjAppendAfterCom( o, com, (uint32_t)strlen(com) );
+}
+
+/*
+============
+LiObjAppendValNull
+============
+*/
+void LiObjAppendValNull( liNode_t *o ) {
+    liassert( o );
+    LiValArrayAppendEmpty( &(o->values) );
+}
+
+/*
+============
+LiObjAppendValStr
+============
+*/
+void LiObjAppendValStr( liNode_t *o, const char *s, uint32_t len ) {
+    liassert( o );
+    liassert( s );
+    
+    liVal_t *v = LiValArrayAppendEmpty( &(o->values) );
+    LiValInitLiStr( v, LiStrCreate( s, len ) );
+}
+
+/*
+============
+LiObjAppendValCstr
+============
+*/
+void LiObjAppendValCstr( liNode_t *o, const char *s ) {
+    liassert( o );
+    liassert( s );
+    
+    liVal_t *v = LiValArrayAppendEmpty( &(o->values) );
+    LiValInitLiStr( v, LiStrCreateCstr( s ) );
 }
 
 
@@ -1017,12 +1150,13 @@ static licode_t LiWriteIndent( liFile_t f, fnLiWrite wr, int indent ) {
 
 /*
 ============
-LiWriteLiStr
+LiWriteStr
 ============
 */
-static licode_t LiWriteLiStr( liFile_t f, fnLiWrite wr, const liStr_t *s ) {
+static licode_t LiWriteStr( liFile_t f, fnLiWrite wr,
+        const char *s, uint32_t len ) {
     liassert( s );
-    ssize_t ret = wr( s->str, s->len, f );
+    ssize_t ret = wr( s, len, f );
     if( ret < 0 ) {
         return LI_EWRITE;
     }
@@ -1036,11 +1170,77 @@ LiWriteCstr
 */
 static licode_t LiWriteCstr( liFile_t f, fnLiWrite wr, const char *s ) {
     liassert( s );
-    ssize_t ret = wr( s, strlen(s), f );
-    if( ret < 0 ) {
-        return LI_EWRITE;
+    return LiWriteStr( f, wr, s, (uint32_t)strlen(s) );
+}
+
+/*
+============
+LiWriteLiStr
+============
+*/
+static licode_t LiWriteLiStr( liFile_t f, fnLiWrite wr, liStr_t *s ) {
+    liassert( s );
+    return LiWriteStr( f, wr, s->str, s->len );
+}
+
+/*
+============
+LiWriteVal
+============
+*/
+static licode_t LiWriteVal( liFile_t f, fnLiWrite wr, liVal_t *v ) {
+    liassert( v );
+    
+    switch( v->type ) {
+        case LI_TNULL:
+            liassert( v->p == NULL );
+            LiWriteCstr( f, wr, "null" );
+            break;
+            
+        case LI_TSTR:
+            if( v->vstr == NULL ) {
+                LiWriteCstr( f, wr, "\"\"" );
+            } else {
+                LiWriteCstr( f, wr, "\"" );
+                LiWriteLiStr( f, wr, v->vstr );
+                LiWriteCstr( f, wr, "\"" );
+            }
+            break;
+            
+        default:
+            liverifya( 0, "error: unknown value type [%d]", v->type );
     }
+    
     return LI_OK;
+}
+
+/*
+============
+LiWriteValArray
+============
+*/
+static licode_t LiWriteValArray( liFile_t f, fnLiWrite wr, liValArray_t *a ) {
+    liassert( a );
+    
+    
+    /* write first value */
+    licode_t ret;
+    ret = LiWriteVal( f, wr, a->array );
+    if( ret != LI_OK ) {
+        return ret;
+    }
+    
+    int i;
+    for( i = 1; i < a->arrayNumber; i++ ) {
+        LiWriteCstr( f, wr, ", " );
+        /* write array of values */
+        ret = LiWriteVal( f, wr, a->array + i );
+        if( ret != LI_OK ) {
+            break;
+        }
+    }
+    
+    return ret;
 }
 
 /*
@@ -1055,27 +1255,26 @@ static void LiWriteHelper_r( liFile_t f, fnLiWrite wr, liNode_t *o,
         
         LiWriteIndent( f, wr, indent );
         
-        /* write identificator */
-        if( o->id ) {
-            LiWriteLiStr( f, wr, o->id );
+        /* write key */
+        if( o->key ) {
+            LiWriteLiStr( f, wr, o->key );
             LiWriteCstr( f, wr, " = " );
         }
         
         /* write subtree */
         if( o->firstChild ) {
             /* begin of object */
-            LiWriteCstr( f, wr, "\n" );
-            LiWriteCstr( f, wr, "{" );
+            LiWriteCstr( f, wr, "{\n" );
             LiWriteHelper_r( f, wr, o->firstChild, indent + 1, flags );
             LiWriteIndent( f, wr, indent );
             /* end of object */
             LiWriteCstr( f, wr, "}" );
         } else if( o->values ) {
-            
+            LiWriteValArray( f, wr, o->values );
         } else {
             LiWriteCstr( f, wr, "null" );
         }
-        
+        LiWriteCstr( f, wr, "\n" );
     } while( (o = o->next) != NULL );
 }
 
