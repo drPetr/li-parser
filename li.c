@@ -5,28 +5,23 @@
 #include <stdarg.h>
 #include <stdio.h>
 
+uint32_t CeilPow2( uint32_t v ) {
+    v--;
+    v |= v >> 1;
+    v |= v >> 2;
+    v |= v >> 4;
+    v |= v >> 8;
+    v |= v >> 16;
+    v++;
+    return v;
+}
+
 
 #define LI_ID_MAX_LEN       127
 #define LI_STR_MAX_LEN      4095
 #define PTRSIZE             (sizeof(void*))
 
 #define liunused(a)         ((void)a)
-
-/*
-============
-__impl_liverify
-============
-*/
-static void __impl_liverify( int e, const char* expr, const char* file, 
-        int line, const char *function ) {
-    if( !e ){
-        fprintf( stderr, "verification failed: %s\n", expr );
-        fprintf( stderr, "file: %s\n", file );
-        fprintf( stderr, "line: %d\n", line );
-        fprintf( stderr, "function: %s\n", function );
-        exit(1);
-    }
-}
 
 /*
 ============
@@ -42,18 +37,20 @@ static void __impl_liverifya( int e, const char* expr, const char* file,
         fprintf( stderr, "file: %s\n", file );
         fprintf( stderr, "line: %d\n", line );
         fprintf( stderr, "function: %s\n", function );
-        vfprintf( stderr, fmt, args );
+        if( fmt ) {
+            vfprintf( stderr, fmt, args );
+        }
         va_end( args );
         exit(1);
     }
 }
 
 #define liverify(e)                                 \
-    __impl_liverify( (int)(!!(e)), #e, __FILE__,    \
-    __LINE__, __FUNCTION__ )
+    __impl_liverifya( (int)(!!(e)), #e, __FILE__,   \
+    __LINE__, __FUNCTION__, NULL )
 
 #define liverifya(e,a,...)                          \
-    __impl_liverifya( (int)(!!(e)), #e, __FILE__,  \
+    __impl_liverifya( (int)(!!(e)), #e, __FILE__,   \
     __LINE__, __FUNCTION__, a, ##__VA_ARGS__ )
 
 
@@ -63,21 +60,6 @@ static void __impl_liverifya( int e, const char* expr, const char* file,
     #define liassert(e)
     #define liasserta(e,a,...)
 #else
-/*
-============
-__impl_liassert
-============
-*/
-static void __impl_liassert( int e, const char* expr, const char* file, 
-        int line, const char *function ) {
-    if( !e ){
-        fprintf( stderr, "assertion failed: %s\n", expr );
-        fprintf( stderr, "file: %s\n", file );
-        fprintf( stderr, "line: %d\n", line );
-        fprintf( stderr, "function: %s\n", function );
-        exit(1);
-    }
-}
 
 /*
 ============
@@ -93,15 +75,19 @@ static void __impl_liasserta( int e, const char* expr, const char* file,
         fprintf( stderr, "file: %s\n", file );
         fprintf( stderr, "line: %d\n", line );
         fprintf( stderr, "function: %s\n", function );
-        vfprintf( stderr, fmt, args );
+        if( fmt ) {
+            vfprintf( stderr, fmt, args );
+        }
         va_end( args );
         exit(1);
     }
 }
 
-    #define liassert(e)                          \
-        __impl_liassert( (int)(!!(e)), #e, __FILE__,    \
-        __LINE__, __FUNCTION__ )
+    #define onlydebug(act)  act
+
+    #define liassert(e)                                 \
+        __impl_liasserta( (int)(!!(e)), #e, __FILE__,   \
+        __LINE__, __FUNCTION__, NULL )
         
     #define liasserta(e,a,...)                          \
         __impl_liasserta( (int)(!!(e)), #e, __FILE__,   \
@@ -335,9 +321,9 @@ LiStrAlloc
 liStr_t *LiStrAlloc( uint32_t siz ) {
     liStr_t *s;
     
-    liassert( siz != 0 );
+    liassert( siz >= 1 );
     
-    siz = (siz + 31) & ~31; 
+    /* siz = CeilPow2( siz ); */
     s = LiAlloc( sizeof(liStr_t) + siz, LI_TYID_STR );
     s->len = 0;
     s->alloced = siz;
@@ -355,9 +341,9 @@ LiStrRealloc
 */
 liStr_t *LiStrRealloc( liStr_t *s, uint32_t siz ) {
     liassert( s );
-    liassert( siz != 0 );
+    liassert( siz >= 1 );
     
-    siz = (siz + 31) & ~31; 
+    siz = CeilPow2( siz );
     s = LiRealloc( s, sizeof(liStr_t) + siz, LI_TYID_STR );
     s->alloced = siz;
     if( s->len >= siz ) {
@@ -460,6 +446,49 @@ void LiStrConcatCstr( liStr_t **s, const char *cstr ) {
 
 /*
 ============
+LiValInit
+============
+*/
+void LiValInit( liVal_t *val, litype_t type ) {
+    liassert( val );
+    
+    val->vstr = NULL;
+    val->type = type;
+    val->flags = 0;
+}
+
+/*
+============
+LiValInitStr
+============
+*/
+void LiValInitStr( liVal_t *val, liStr_t *s ) {
+    liassert( val );
+    
+    LiValInit( val, LI_TSTR );
+    val->vstr = s;
+}
+
+/*
+============
+LiValFree
+============
+*/
+void LiValFree( liVal_t *val ) {
+    switch( val->type ) {
+        case LI_TNULL:
+            break;
+            
+        case LI_TSTR:
+            LiStrFree( val->vstr );
+            break;
+    }
+    
+    liverifya( 0, "error: unknown value type [%d]", val->type );
+}
+
+/*
+============
 LiValArrayAlloc
 ============
 */
@@ -467,9 +496,9 @@ liValArray_t *LiValArrayAlloc( uint32_t num ) {
     liValArray_t *array;
     uint32_t siz;
     
-    liassert( num != 0 );
+    liassert( num >= 1 );
     
-    num = (num + 31) & ~31;
+    /* num = CeilPow2( num ); */
     siz = sizeof(liValArray_t) + sizeof(liVal_t) * num;
     array = (liValArray_t*)LiAlloc( siz, LI_TYID_VALARR );
     array->arrayMaxNumber = num;
@@ -487,9 +516,9 @@ liValArray_t *LiValArrayRealloc( liValArray_t *array, uint32_t num ) {
     uint32_t siz;
     
     liassert( array );
-    liassert( num != 0 );
+    liassert( num >= 1 );
     
-    num = (num + 31) & ~31;
+    num = CeilPow2( num );
     /* need to re-allocate memory? */
     if( num == array->arrayMaxNumber ) {
         /* no need to reallocate memory */
@@ -504,29 +533,27 @@ liValArray_t *LiValArrayRealloc( liValArray_t *array, uint32_t num ) {
         array->arrayNumber = array->arrayMaxNumber;
     }
     
+    onlydebug( printf( "LiValArrayRealloc()[%d]\n", num ) );
+    
     return array;
 }
 
 /*
 ============
-LiStrFree
+LiValArrayFree
 ============
 */
 void LiValArrayFree( liValArray_t *array ) {
+    int i;
+    
     liassert( array );
+    
+    for( i = 0; i < array->arrayNumber; i++ ) {
+        LiValFree( &(array->array[i]) );
+    }
     LiDealloc( array );
 }
 
-/*
-============
-LiValInit
-============
-*/
-void LiValInit( liVal_t *val, litype_t type ) {
-    val->vstr = NULL;
-    val->type = type;
-    val->flags = 0;
-}
 
 
 /*
@@ -840,6 +867,11 @@ static void LiNodeFreeSubtreeHelper_r( liNode_t *node ) {
     do {
         next = node->next;
         if( node->firstChild ) {
+            /* free array of values */
+            if( node->values ) {
+                LiValArrayFree( node->values );
+            }
+            /* free node */
             LiNodeFreeSubtreeHelper_r( node->firstChild );
         }
         LiDealloc( node );
@@ -871,4 +903,199 @@ void LiFree( liNode_t *li ) {
         li = li->parent;
     }
     LiNodeFreeSubtreeHelper_r( li );
+}
+
+
+
+/*
+================================================
+                    li object
+================================================
+*/
+
+/*
+============
+LiObjCreate
+============
+*/
+liNode_t *LiObjCreate( const char *id, uint32_t len ) {
+    liNode_t *node;
+    
+    node = LiNodeCreate();
+    node->id = LiStrCreate( id, len );
+    
+    
+    return node;
+}
+
+/*
+============
+LiObjCreateCstr
+============
+*/
+liNode_t *LiObjCreateCstr( const char *id ) {
+    return LiObjCreate( id, (uint32_t)strlen(id) );
+}
+
+/*
+============
+LiObjAppendInnerCom
+============
+*/
+void LiObjAppendInnerCom( liNode_t *o, const char *com, uint32_t len ) {
+    liassert( o );
+    liassert( com );
+    
+    if( o->innerCom ) {
+        LiStrConcat( &(o->innerCom), com, len );
+    } else {
+        o->innerCom = LiStrCreate( com, len );
+    }
+}
+
+/*
+============
+LiObjAppendInnerComCstr
+============
+*/
+void LiObjAppendInnerComCstr( liNode_t *o, const char *com ) {
+    liassert( o );
+    liassert( com );
+    LiObjAppendInnerCom( o, com, (uint32_t)strlen(com) );
+}
+
+/*
+============
+LiObjAppendAfterCom
+============
+*/
+void LiObjAppendAfterCom( liNode_t *o, const char *com, uint32_t len ) {
+    liassert( o );
+    liassert( com );
+    
+    if( o->afterCom ) {
+        LiStrConcat( &(o->afterCom), com, len );
+    } else {
+        o->afterCom = LiStrCreate( com, len );
+    }
+}
+
+/*
+============
+LiObjAppendAfterComCstr
+============
+*/
+void LiObjAppendAfterComCstr( liNode_t *o, const char *com ) {
+    liassert( o );
+    liassert( com );
+    LiObjAppendAfterCom( o, com, (uint32_t)strlen(com) );
+}
+
+
+
+/*
+================================================
+                    li writer
+================================================
+*/
+
+/*
+============
+LiWriteIndent
+============
+*/
+static licode_t LiWriteIndent( liFile_t f, fnLiWrite wr, int indent ) {
+    int i;
+    for( i = 0; i < indent; i++ ) {
+        ssize_t ret = wr( "    ", 4, f );
+        if( ret < 0 ) {
+            return LI_EWRITE;
+        }
+    }
+    return LI_OK;
+}
+
+/*
+============
+LiWriteLiStr
+============
+*/
+static licode_t LiWriteLiStr( liFile_t f, fnLiWrite wr, const liStr_t *s ) {
+    liassert( s );
+    ssize_t ret = wr( s->str, s->len, f );
+    if( ret < 0 ) {
+        return LI_EWRITE;
+    }
+    return LI_OK;
+}
+
+/*
+============
+LiWriteCstr
+============
+*/
+static licode_t LiWriteCstr( liFile_t f, fnLiWrite wr, const char *s ) {
+    liassert( s );
+    ssize_t ret = wr( s, strlen(s), f );
+    if( ret < 0 ) {
+        return LI_EWRITE;
+    }
+    return LI_OK;
+}
+
+/*
+============
+LiWriteHelper_r
+============
+*/
+static void LiWriteHelper_r( liFile_t f, fnLiWrite wr, liNode_t *o,
+        int indent, liflag_t flags ) {
+    do {
+        liassert( (o->firstChild && !o->values) || (!o->firstChild) );
+        
+        LiWriteIndent( f, wr, indent );
+        
+        /* write identificator */
+        if( o->id ) {
+            LiWriteLiStr( f, wr, o->id );
+            LiWriteCstr( f, wr, " = " );
+        }
+        
+        /* write subtree */
+        if( o->firstChild ) {
+            /* begin of object */
+            LiWriteCstr( f, wr, "\n" );
+            LiWriteCstr( f, wr, "{" );
+            LiWriteHelper_r( f, wr, o->firstChild, indent + 1, flags );
+            LiWriteIndent( f, wr, indent );
+            /* end of object */
+            LiWriteCstr( f, wr, "}" );
+        } else if( o->values ) {
+            
+        } else {
+            LiWriteCstr( f, wr, "null" );
+        }
+        
+    } while( (o = o->next) != NULL );
+}
+
+/*
+============
+LiWrite
+============
+*/
+void LiWrite( liIO_t *io, liNode_t *o, const char *name, liflag_t flags ) {
+    liassert( o );
+    
+    liFile_t f;
+    
+    if( io == NULL ) {
+        io = &liDefaultIO;
+    }
+    
+    f = io->open( name, 'w' );
+    if( o ) {
+        LiWriteHelper_r( f, io->write, o, 0, flags );
+    }
+    io->close( f );
 }

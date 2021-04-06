@@ -8,6 +8,7 @@ typedef uint32_t        lityid_t;
 typedef uint32_t        litype_t;
 typedef uint32_t        libool_t;
 typedef uint32_t        licode_t;
+typedef uint32_t        liflag_t;
 
 /* lityid */
 #define LI_TYID_STR     1
@@ -25,6 +26,7 @@ typedef uint32_t        licode_t;
 
 /* licodes */
 #define LI_OK           ((licode_t)0)
+#define LI_EWRITE       ((licode_t)1)
 
 
 /* li allocator */
@@ -95,6 +97,7 @@ typedef struct liNode_t {
 void        LiSetAllocator( liAlloc_t *alloc );
 liAlloc_t   *LiGetAllocator( void );
 
+
 liStr_t     *LiStrAlloc( uint32_t siz );
 liStr_t     *LiStrRealloc( liStr_t *s, uint32_t siz );
 void        LiStrFree( liStr_t *s );
@@ -103,10 +106,14 @@ liStr_t     *LiStrCreateCstr( const char *cstr );
 void        LiStrConcat( liStr_t **s, const char *cstr, uint32_t len );
 void        LiStrConcatCstr( liStr_t **s, const char *cstr );
 
-liValArray_t    *LiValArrayAlloc( uint32_t num );
-liValArray_t    *LiValArrayRealloc( liValArray_t *array, uint32_t num );
-void            LiValArrayFree( liValArray_t *array );
-void            LiValInit( liVal_t *val, litype_t type );
+
+void        LiValInit( liVal_t *val, litype_t type );
+void        LiValInitStr( liVal_t *val, liStr_t *s );
+void        LiValFree( liVal_t *val );
+liValArray_t *LiValArrayAlloc( uint32_t num );
+liValArray_t *LiValArrayRealloc( liValArray_t *array, uint32_t num );
+void        LiValArrayFree( liValArray_t *array );
+
 
 void        LiInsertFirstChild( liNode_t *node, liNode_t *insert );
 void        LiInsertLastChild( liNode_t *node, liNode_t *insert );
@@ -118,6 +125,20 @@ liNode_t    *LiExtract( liNode_t *node );
 liNode_t    *LiExtractSiblings( liNode_t *left, liNode_t *right );
 liNode_t    *LiExtractChildren( liNode_t *node );
 liNode_t    *LiNodeCreate( void );
+void        LiFreeSubtree( liNode_t *node );
+void        LiFree( liNode_t *li );
+
+
+liNode_t    *LiObjCreate( const char *id, uint32_t len );
+liNode_t    *LiObjCreateCstr( const char *id );
+void        LiObjAppendInnerCom( liNode_t *o, const char *com, uint32_t len );
+void        LiObjAppendInnerComCstr( liNode_t *o, const char *com );
+void        LiObjAppendAfterCom( liNode_t *o, const char *com, uint32_t len );
+void        LiObjAppendAfterComCstr( liNode_t *o, const char *com );
+
+
+
+void        LiWrite( liIO_t *io, liNode_t *o, const char *name, liflag_t flags );
 
 
 
