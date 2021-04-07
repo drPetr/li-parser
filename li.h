@@ -15,11 +15,11 @@ typedef uint32_t        liflag_t;
 #define LI_TYID_NODE    2
 #define LI_TYID_VALARR  3
 
-/* litype */
-#define LI_TNULL       0
-#define LI_TOBJ        1
-#define LI_TARR        2
-#define LI_TSTR        3
+/* litype (li value type) */
+#define LI_VTUNDEF      0
+#define LI_VTNULL       1
+#define LI_VTOBJ        2
+#define LI_VTSTR        4
 
 /* libool */
 #define lifalse         ((libool_t)0)
@@ -62,40 +62,22 @@ typedef struct liStr_t {
     char                str[0];     /* null-terminated string */
 } liStr_t;
 
-/* livalue */
-typedef struct liVal_t {
+/* liObj_t */
+typedef struct liObj_t {
+    struct liObj_t      *parent;    /* parent */
+    struct liObj_t      *next;      /* next sibling */
+    struct liObj_t      *prev;      /* previous sibling */
+    struct liObj_t      *firstChild;/* first child */
+    struct liObj_t      *lastChild; /* last child */
+    
     union {
-        void            *p;         /* pointer */
-        liStr_t         *vstr;      /* "string" value */
+        void            *ptr;
+        liStr_t         *vstr;
     };
-    litype_t            type;       /* value type */
-    uint32_t            flags;
-} liVal_t;
-
-/* livalue array */
-typedef struct {
-    uint32_t        arrayMaxNumber; /* maximum number of values in an array */
-    uint32_t        arrayNumber;    /* number of values */
-    liVal_t         array[0];       /* array of values */
-} liValArray_t;
-
-
-/* liNode_t */
-typedef struct liNode_t {
-    struct liNode_t *parent;        /* parent */
-    struct liNode_t *next;          /* next sibling */
-    struct liNode_t *prev;          /* previous sibling */
     
-    
-    struct liNode_t *firstChild;    /* first child */
-    struct liNode_t *lastChild;     /* last child */
-    
-    liStr_t         *key;           /* key */
-    liStr_t         *innerCom;      /* inner ...{# li comment\n...} */
-    liStr_t         *afterCom;      /* after {...}# li comment\n... */
-    
-    liValArray_t    *values;        /* array of values */
-} liNode_t;
+    liStr_t             *key;       /* key */
+    litype_t            type;       /* object type */
+} liObj_t;
 
 
 void        LiSetAllocator( liAlloc_t *alloc );
@@ -113,49 +95,31 @@ void        LiStrSet( liStr_t **s, const char *cstr, uint32_t len );
 void        LiStrSetCstr( liStr_t **s, const char *cstr );
 
 
-void        LiValInit( liVal_t *val, litype_t type );
-void        LiValInitLiStr( liVal_t *val, liStr_t *s );
-void        LiValFree( liVal_t *val );
-liValArray_t *LiValArrayAlloc( uint32_t num );
-liValArray_t *LiValArrayRealloc( liValArray_t *array, uint32_t num );
-void        LiValArrayFree( liValArray_t *array );
-liVal_t     *LiValArrayAppendEmpty( liValArray_t **array );
+void        LiInsertFirstChild( liObj_t *node, liObj_t *insert );
+void        LiInsertLastChild( liObj_t *node, liObj_t *insert );
+void        LiInsertBefore( liObj_t *node, liObj_t *insert );
+void        LiInsertAfter( liObj_t *node, liObj_t *insert );
+void        LiInsertFirst( liObj_t *node, liObj_t *insert );
+void        LiInsertLast( liObj_t *node, liObj_t *insert );
+liObj_t     *LiExtract( liObj_t *node );
+liObj_t     *LiExtractSiblings( liObj_t *left, liObj_t *right );
+liObj_t     *LiExtractChildren( liObj_t *node );
+liObj_t     *LiNodeCreate( void );
+void        LiFreeSubtree( liObj_t *node );
+void        LiFree( liObj_t *li );
 
 
-void        LiInsertFirstChild( liNode_t *node, liNode_t *insert );
-void        LiInsertLastChild( liNode_t *node, liNode_t *insert );
-void        LiInsertBefore( liNode_t *node, liNode_t *insert );
-void        LiInsertAfter( liNode_t *node, liNode_t *insert );
-void        LiInsertFirst( liNode_t *node, liNode_t *insert );
-void        LiInsertLast( liNode_t *node, liNode_t *insert );
-liNode_t    *LiExtract( liNode_t *node );
-liNode_t    *LiExtractSiblings( liNode_t *left, liNode_t *right );
-liNode_t    *LiExtractChildren( liNode_t *node );
-liNode_t    *LiNodeCreate( void );
-void        LiFreeSubtree( liNode_t *node );
-void        LiFree( liNode_t *li );
-
-
-liNode_t    *LiObjCreate( void );
-
-void        LiObjSetKeyStr( liNode_t *o, const char *s, uint32_t len );
-void        LiObjSetKeyCstr( liNode_t *o, const char *s );
-void        LiObjSetKeyRef( liNode_t *o, liNode_t *ref );
-
-liNode_t    *LiObjCreateStr( const char *key, uint32_t len );
-liNode_t    *LiObjCreateCstr( const char *key );
-void        LiObjAppendInnerCom( liNode_t *o, const char *com, uint32_t len );
-void        LiObjAppendInnerComCstr( liNode_t *o, const char *com );
-void        LiObjAppendAfterCom( liNode_t *o, const char *com, uint32_t len );
-void        LiObjAppendAfterComCstr( liNode_t *o, const char *com );
-void        LiObjAppendValNull( liNode_t *o );
-void        LiObjAppendValStr( liNode_t *o, const char *s, uint32_t len );
-void        LiObjAppendValCstr( liNode_t *o, const char *s );
+void        LiSetKeyStr( liObj_t *o, const char *key, uint32_t len );
+void        LiSetKeyCstr( liObj_t *o, const char *key );
+liObj_t     *LiObj( void );
+liObj_t     *LiNull( void );
+liObj_t     *LiStr( const char *s, uint32_t len );
+liObj_t     *LiCstr( const char *s );
 
 
 
 
-void        LiWrite( liIO_t *io, liNode_t *o, const char *name, liflag_t flags );
+void        LiWrite( liIO_t *io, liObj_t *o, const char *name, liflag_t flags );
 
 
 

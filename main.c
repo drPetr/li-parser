@@ -12,16 +12,6 @@
 #define li_sconcat      LiStrConcat
 #define li_sconcat_cs   LiStrConcatCstr
 
-#define livalarr        liValArray_t
-#define lival           liVal_t
-#define li_varralloc    LiValArrayAlloc
-#define li_varrrealloc  LiValArrayRealloc
-#define li_varrfree     LiValArrayFree
-#define li_vinit        LiValInit
-#define li_vinit_s      LiValInitStr
-
-#define li_vappend_s    LiValAppendStr
-
 #define li_ins_first_child  LiInsertFirstChild
 #define li_ins_last_child   LiInsertLastChild
 #define li_ins_before       LiInsertBefore
@@ -35,32 +25,27 @@
 #define li_free_subtree     LiFreeSubtree
 #define li_free             LiFree
 
-#define liobj                       liNode_t
-#define lonode                      liNode_t
-#define li_objcreate                LiObjCreate
-#define li_objcreate_s              LiObjCreateStr
-#define li_objcreate_cs             LiObjCreateCstr
-#define li_objappend_inner_com      LiObjAppendInnerCom
-#define li_objappend_inner_com_cs   LiObjAppendInnerComCstr
-#define li_objappend_after_com      LiObjAppendAfterCom
-#define li_objappend_after_com_cs   LiObjAppendAfterComCstr
-#define li_objappend_vnull          LiObjAppendValNull
-#define li_objappend_vs             LiObjAppendValStr
-#define li_objappend_vcs            LiObjAppendValCstr
+#define liobj               liObj_t
+#define li_setkey           LiSetKeyStr
+#define li_setkey_cs        LiSetKeyCstr
+#define li_obj              LiObj
+#define li_null             LiNull
+#define li_s                LiStr
+#define li_cs               LiCstr
 
 
-#define li_write                    LiWrite
+#define li_write            LiWrite
 
 
 liobj *mcom( const char *id, const char *exe ) {
     liobj *c, *o;
     
-    c = li_objcreate();
-    o = li_objcreate_cs( "id" );
-    li_objappend_vcs( o, id );
+    c = li_obj();
+    o = li_cs( id );
+    li_setkey_cs( o, "id" );
     li_ins_last_child( c, o );
-    o = li_objcreate_cs( "exe" );
-    li_objappend_vcs( o, exe );
+    o = li_cs( exe );
+    li_setkey_cs( o, "exe" );
     li_ins_last_child( c, o );
     
     return c;
@@ -69,12 +54,13 @@ liobj *mcom( const char *id, const char *exe ) {
 liobj *mcom0( const char *id, const char *exe ) {
     liobj *c, *o;
     
-    c = li_objcreate_cs( "command" );
-    o = li_objcreate_cs( "id" );
-    li_objappend_vcs( o, id );
+    c = li_obj();
+    li_setkey_cs( c, "command" ); 
+    o = li_cs( id );
+    li_setkey_cs( o, "id" );
     li_ins_last_child( c, o );
-    o = li_objcreate_cs( "exe" );
-    li_objappend_vcs( o, exe );
+    o = li_cs( exe );
+    li_setkey_cs( o, "exe" );
     li_ins_last_child( c, o );
     
     return c;
@@ -84,18 +70,29 @@ liobj *MakeExample1( void ) {
     liobj *root = NULL;
     liobj *o, *li;
     
-    root = li_objcreate_cs( "keybingidg" );
+    root = li_obj();
+    li_setkey_cs( root, "keybingidg" ); 
     
-    o = li_objcreate_cs( "a_null" );
-    li_objappend_vnull( o );
+    o = li_null();
+    li_setkey_cs( o, "a_null" );
     li_ins_last_child( root, o );
     
-    o = li_objcreate_cs( "group" );
+    li = li_cs( "Hello" );
+    li_ins_last( o, li );
+    li = li_cs( "My" );
+    li_ins_last( o, li );
+    li = li_cs( "Favorite" );
+    li_ins_last( o, li );
+    li = li_cs( "World!" );
+    li_ins_last( o, li );
+    
+    o = li_obj();
+    li_setkey_cs( o, "group" );
     li_ins_last_child( root, o );
     
-    li = li_objcreate_cs( "name" );
-    li_objappend_vcs( li, "kb_grp_direction" );
-    li_ins_last_child( li, o );
+    li = li_cs( "kb_grp_direction" );
+    li_setkey_cs( li, "name" );
+    li_ins_last_child( o, li );
     
     li_ins_last_child( o, mcom0( "kb_left", "left" ) );
     li_ins_last_child( o, mcom( "kb_right", "right" ) );
@@ -103,12 +100,13 @@ liobj *MakeExample1( void ) {
     li_ins_last_child( o, mcom( "kb_down", "down" ) );
     
     
-    o = li_objcreate_cs( "group" );
+    o = li_obj();
     li_ins_last_child( root, o );
     
-    li = li_objcreate_cs( "name" );
-    li_objappend_vcs( li, "kb_grp_movement" );
-    li_ins_last_child( li, o );
+    li = li_cs( "kb_grp_movement" );
+    li_setkey_cs( li, "name" );
+    li_ins_last_child( o, li );
+    
     
     li_ins_last_child( o, mcom0( "kb_forward", "forward" ) );
     li_ins_last_child( o, mcom( "kb_backward", "back" ) );
@@ -123,12 +121,14 @@ liobj *MakeExample1( void ) {
     li_ins_last_child( o, mcom( "kb_right_lookout", "rlookout" ) );
     
     
-    o = li_objcreate_cs( "group" );
+    
+    o = li_obj();
     li_ins_last_child( root, o );
     
-    li = li_objcreate_cs( "name" );
-    li_objappend_vcs( li, "kb_grp_weapons" );
-    li_ins_last_child( li, o );
+    li = li_cs( "kb_grp_weapons" );
+    li_setkey_cs( li, "name" );
+    li_ins_last_child( o, li );
+    
     
     li_ins_last_child( o, mcom0( "kb_weapon1", "wpn_1" ) );
     li_ins_last_child( o, mcom( "kb_weapon2", "wpn_2" ) );
@@ -137,6 +137,7 @@ liobj *MakeExample1( void ) {
     li_ins_last_child( o, mcom( "kb_weapon5", "wpn_5" ) );
     li_ins_last_child( o, mcom( "kb_weapon6", "wpn_6" ) );
     li_ins_last_child( o, mcom( "kb_wpn_next", "wpn_next" ) );
+    li_ins_last_child( o, mcom( "kb_next_slot", "next_slot" ) );
     li_ins_last_child( o, mcom( "kb_prev_slot", "prev_slot" ) );
     li_ins_last_child( o, mcom( "kb_fire", "wpn_fire" ) );
     li_ins_last_child( o, mcom( "kb_zoom", "wpn_zoom" ) );
@@ -147,12 +148,14 @@ liobj *MakeExample1( void ) {
     
     
     
-    o = li_objcreate_cs( "group" );
+    o = li_obj();
     li_ins_last_child( root, o );
     
-    li = li_objcreate_cs( "name" );
-    li_objappend_vcs( li, "kb_grp_inventory" );
-    li_ins_last_child( li, o );
+    li = li_cs( "kb_grp_inventory" );
+    li_setkey_cs( li, "name" );
+    li_ins_last_child( o, li );
+    
+    
     
     li_ins_last_child( o, mcom0( "kb_inventory", "inventory" ) );
     li_ins_last_child( o, mcom( "kb_active_jobs", "active_jobs" ) );
@@ -165,13 +168,14 @@ liobj *MakeExample1( void ) {
     li_ins_last_child( o, mcom( "kb_drop", "drop" ) );
     li_ins_last_child( o, mcom( "kb_turn_engine", "turn_engine" ) );
     
-    
-    o = li_objcreate_cs( "group" );
+    o = li_obj();
     li_ins_last_child( root, o );
     
-    li = li_objcreate_cs( "name" );
-    li_objappend_vcs( li, "kb_grp_common" );
-    li_ins_last_child( li, o );
+    li = li_cs( "kb_grp_common" );
+    li_setkey_cs( li, "name" );
+    li_ins_last_child( o, li );
+    
+    
     
     li_ins_last_child( o, mcom0( "kb_pause", "pause" ) );
     li_ins_last_child( o, mcom( "kb_use", "use" ) );
@@ -185,12 +189,13 @@ liobj *MakeExample1( void ) {
     li_ins_last_child( o, mcom( "kb_cam_3", "cam_3" ) );
     
     
-    o = li_objcreate_cs( "group" );
+    o = li_obj();
     li_ins_last_child( root, o );
     
-    li = li_objcreate_cs( "name" );
-    li_objappend_vcs( li, "kb_grp_multiplayer" );
-    li_ins_last_child( li, o );
+    li = li_cs( "kb_grp_multiplayer" );
+    li_setkey_cs( li, "name" );
+    li_ins_last_child( o, li );
+    
 
     li_ins_last_child( o, mcom0( "kb_artefact", "artefact" ) );
     li_ins_last_child( o, mcom( "kb_scores", "scores" ) );
@@ -208,6 +213,8 @@ liobj *MakeExample1( void ) {
     
     return root;
 }
+
+
 
 
 int main( int argc, char **argv ) {
