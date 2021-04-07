@@ -32,6 +32,9 @@
 #define li_null             LiNull
 #define li_s                LiStr
 #define li_cs               LiCstr
+#define li_int              LiInt
+#define li_uint             LiUint
+#define li_bool             LiBool
 
 
 #define li_write            LiWrite
@@ -79,11 +82,38 @@ liobj *MakeExample1( void ) {
     
     li = li_cs( "Hello" );
     li_ins_last( o, li );
-    li = li_cs( "My" );
-    li_ins_last( o, li );
-    li = li_cs( "Favorite" );
-    li_ins_last( o, li );
     li = li_cs( "World!" );
+    li_ins_last( o, li );
+    
+    li = li_int( 100 );
+    li_ins_last( o, li );
+    li = li_int( -200 );
+    li_ins_last( o, li );
+    li = li_int( 1024 * 1024 );
+    li_ins_last( o, li );
+    
+    li = li_uint( 0x1234567812345678, 0 );
+    li_ins_last( o, li );
+    
+    li = li_uint( 0xff00ff00aabbccdd, 0 );
+    li_ins_last( o, li );
+    
+    li = li_uint( 0xffffffffffffffff, 0 );
+    li_ins_last( o, li );
+    
+    li = li_uint( 0, 0 );
+    li_ins_last( o, li );
+    
+    li = li_uint( 1231235654324, 0 );
+    li_ins_last( o, li );
+    
+    li = li_bool( 1 );
+    li_ins_last( o, li );
+    li = li_bool( 0 );
+    li_ins_last( o, li );
+    li = li_bool( 1 );
+    li_ins_last( o, li );
+    li = li_bool( 0 );
     li_ins_last( o, li );
     
     o = li_obj();

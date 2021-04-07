@@ -13,13 +13,15 @@ typedef uint32_t        liflag_t;
 /* lityid */
 #define LI_TYID_STR     1
 #define LI_TYID_NODE    2
-#define LI_TYID_VALARR  3
 
 /* litype (li value type) */
 #define LI_VTUNDEF      0
 #define LI_VTNULL       1
 #define LI_VTOBJ        2
 #define LI_VTSTR        4
+#define LI_VTINT        5
+#define LI_VTUINT       6
+#define LI_VTBOOL       7
 
 /* libool */
 #define lifalse         ((libool_t)0)
@@ -73,10 +75,13 @@ typedef struct liObj_t {
     union {
         void            *ptr;
         liStr_t         *vstr;
+        int64_t         vint;
+        uint64_t        vuint;
     };
     
     liStr_t             *key;       /* key */
     litype_t            type;       /* object type */
+    liflag_t            flags;      /* object flags */
 } liObj_t;
 
 
@@ -115,6 +120,9 @@ liObj_t     *LiObj( void );
 liObj_t     *LiNull( void );
 liObj_t     *LiStr( const char *s, uint32_t len );
 liObj_t     *LiCstr( const char *s );
+liObj_t     *LiInt( int64_t i );
+liObj_t     *LiUint( uint64_t u, liflag_t flags );
+liObj_t     *LiBool( libool_t b );
 
 
 

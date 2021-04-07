@@ -5,16 +5,6 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-uint32_t CeilPow2( uint32_t v ) {
-    v--;
-    v |= v >> 1;
-    v |= v >> 2;
-    v |= v >> 4;
-    v |= v >> 8;
-    v |= v >> 16;
-    v++;
-    return v;
-}
 
 
 #define LI_ID_MAX_LEN       127
@@ -94,6 +84,63 @@ static void __impl_liasserta( int e, const char* expr, const char* file,
         __LINE__, __FUNCTION__, a, ##__VA_ARGS__ )
 
 #endif
+
+uint32_t CeilPow2( uint32_t v ) {
+    v--;
+    v |= v >> 1;
+    v |= v >> 2;
+    v |= v >> 4;
+    v |= v >> 8;
+    v |= v >> 16;
+    v++;
+    return v;
+}
+
+/*
+============
+UInt64ToStr
+============
+*/
+size_t UInt64ToStr( uint64_t val, char *str, int base ) {
+    static const char alpha[] = "0123456789abcdefghijklmnopqrstuvwxyz";
+    char *p = str;
+    uint8_t digits[64]; /* value digits */
+    int dig = 0;        /* amount of digits */
+    
+    liassert( base >= 2 );
+    liassert( base <= 36 );
+    
+    /* calculate digits */
+    do {
+        digits[dig++] = (uint8_t)(val % base);
+        val /= base;
+    } while( val );
+    
+    /* copy the flipped digits to the output buffer */
+    do {
+        *p++ = alpha[ digits[--dig] ];
+    } while( dig > 0 );
+    *p = 0;
+    
+    return (size_t)(p - str);
+}
+
+/*
+============
+Int64ToStr
+============
+*/
+size_t Int64ToStr( int64_t val, char *str, int base ) {
+    liassert( base >= 2 );
+    liassert( base <= 36 );
+    
+    /* check for negative value */
+    if( val < 0 ) {
+        *str++ = '-';
+        return UInt64ToStr( (uint64_t)(-val), str, base ) + 1;
+    }
+    return UInt64ToStr( (uint64_t)val, str, base );
+}
 
 
 
@@ -777,6 +824,7 @@ liObj_t *LiNodeCreate( void ) {
     node->ptr = NULL;
     node->key = NULL;
     node->type = LI_VTUNDEF;
+    node->flags = 0;
     
     return node;
 }
@@ -913,6 +961,43 @@ liObj_t *LiCstr( const char *s ) {
     return LiStr( s, s ? (uint32_t)strlen(s) : 0 );
 }
 
+/*
+============
+LiInt
+============
+*/
+liObj_t *LiInt( int64_t i ) {
+    liObj_t *o = LiNodeCreate();
+    o->type = LI_VTINT;
+    o->vint = i;
+    return o;
+}
+
+/*
+============
+LiUint
+============
+*/
+liObj_t *LiUint( uint64_t u, liflag_t flags ) {
+    liObj_t *o = LiNodeCreate();
+    o->type = LI_VTUINT;
+    o->vuint = u;
+    o->flags = flags;
+    return o;
+}
+
+/*
+============
+LiBool
+============
+*/
+liObj_t *LiBool( libool_t b ) {
+    liObj_t *o = LiNodeCreate();
+    o->type = LI_VTBOOL;
+    o->vint = b;
+    return o;
+}
+
 
 
 /*
@@ -1001,7 +1086,6 @@ static void LiWriteHelper_r( liFile_t f, fnLiWrite wr, liObj_t *o,
         switch( o->type ) {
             case LI_VTNULL:
                 liassert( o->firstChild == NULL );
-                liassert( o->lastChild == NULL );
                 LiWriteCstr( f, wr, "null" );
                 break;
                 
@@ -1021,11 +1105,37 @@ static void LiWriteHelper_r( liFile_t f, fnLiWrite wr, liObj_t *o,
                 break;
                 
             case LI_VTSTR:
+                liassert( o->firstChild == NULL );
                 LiWriteCstr( f, wr, "\"" );
                 if( o->vstr ) {
                     LiWriteLiStr( f, wr, o->vstr );
                 }
                 LiWriteCstr( f, wr, "\"" );
+                break;
+                
+            case LI_VTINT:
+                liassert( o->firstChild == NULL );
+                {
+                    char buf[256];
+                    Int64ToStr( o->vint, buf, 10 );
+                    LiWriteCstr( f, wr, buf );
+                }
+                break;
+                
+            case LI_VTUINT:
+                liassert( o->firstChild == NULL );
+                {
+                    char buf[256];
+                    buf[0] = '0';
+                    buf[1] = 'x';
+                    UInt64ToStr( o->vuint, buf + 2, 16 );
+                    LiWriteCstr( f, wr, buf );
+                }
+                break;
+            
+            case LI_VTBOOL:
+                liassert( o->firstChild == NULL );
+                LiWriteCstr( f, wr, o->vint ? "true" : "false" );
                 break;
                 
             default:
