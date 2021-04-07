@@ -28,6 +28,7 @@
 #define liobj               liObj_t
 #define li_setkey           LiSetKeyStr
 #define li_setkey_cs        LiSetKeyCstr
+#define li_setflags         LiSetFlags
 #define li_obj              LiObj
 #define li_null             LiNull
 #define li_s                LiStr
@@ -73,11 +74,16 @@ liobj *mcom0( const char *id, const char *exe ) {
 
 
 liobj *MakeExample1( void ) {
+    liobj *a = NULL;
     liobj *root = NULL;
     liobj *o, *li;
     
+    a = li_cs( "hello" );
+    li_setkey_cs( a, "key" ); 
+    
     root = li_obj();
-    li_setkey_cs( root, "keybingidg" ); 
+    li_setkey_cs( root, "keybingidg" );
+    li_ins_first( root, a ); 
     
     o = li_null();
     li_setkey_cs( o, "a_null" );
@@ -89,25 +95,30 @@ liobj *MakeExample1( void ) {
     li_ins_last( o, li );
     
     li = li_int( 100 );
+    li_setflags( li, LI_FSIGN );
     li_ins_last( o, li );
     li = li_int( -200 );
+    li_setflags( li, LI_FSIGN );
     li_ins_last( o, li );
     li = li_int( 1024 * 1024 );
+    li_setflags( li, LI_FSIGN );
     li_ins_last( o, li );
     
-    li = li_uint( 0x1234567812345678, 0 );
+    li = li_uint( 0x1234567812345678 );
+    li_setflags( li, LI_FHEX );
     li_ins_last( o, li );
     
-    li = li_uint( 0xff00ff00aabbccdd, 0 );
+    li = li_uint( 0xff00ff00aabbccdd );
+    li_setflags( li, LI_FBIN );
     li_ins_last( o, li );
     
-    li = li_uint( 0xffffffffffffffff, 0 );
+    li = li_uint( 0xffffffffffffffff );
     li_ins_last( o, li );
     
-    li = li_uint( 0, 0 );
+    li = li_uint( 0 );
     li_ins_last( o, li );
     
-    li = li_uint( 1231235654324, 0 );
+    li = li_uint( 1231235654324 );
     li_ins_last( o, li );
     
     li = li_bool( 1 );
@@ -244,12 +255,13 @@ liobj *MakeExample1( void ) {
     return root;
 }
 
-
 extern int allocCalls;
 extern int deallocCalls;
 extern int reallocCalls;
 extern int allocTyidStrCalls;
 extern int allocTyidNodeCalls;
+
+libool_t LiIsCorrectRefStr( const char *s ) ;
 
 int main( int argc, char **argv ) {
     clock_t start = clock();
@@ -258,10 +270,29 @@ int main( int argc, char **argv ) {
     
     li_write( NULL, li, "out/out.li", 0 );
     
-    li_free( li );
+    
     
     clock_t stop = clock();
     double d = (double)(stop - start) / CLOCKS_PER_SEC;
+    
+    const char *s = ".key";//".keybingidg.group.name";
+    
+    
+    printf( "Pattern [%s]\n", s );
+    liFindData_t dat;
+    licode_t ret = LiFindFirst( &dat, li, s );
+    
+    do {
+        if( ret == LI_OK ) {
+            if( dat.obj->vstr ) {
+                printf( "found data: %s\n", dat.obj->vstr->str );
+            }
+        } else {
+            printf( "ret: [%d]\n", ret );
+            break;
+        }
+    } while( (ret = LiFindNext( &dat )) == LI_OK );
+    
     
     printf( "Alloc calls [%d]\n", allocCalls );
     printf( "Alloc tyid str calls [%d]\n", allocTyidStrCalls );
@@ -269,6 +300,8 @@ int main( int argc, char **argv ) {
     printf( "Realloc calls [%d]\n", reallocCalls );
     printf( "Dealloc calls [%d]\n", deallocCalls );
     printf( "Loop required %f seconds\n", d );
+    
+    li_free( li );
     
     return 0;
 }
