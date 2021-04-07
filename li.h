@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#define LI_MAX_NESTING_LEVEL    4096
+
 /* litypes */
 typedef uint32_t        lityid_t;
 typedef uint32_t        litype_t;
@@ -127,7 +129,7 @@ liObj_t     *LiBool( libool_t b );
 
 
 
-void        LiWrite( liIO_t *io, liObj_t *o, const char *name, liflag_t flags );
+licode_t    LiWrite( liIO_t *io, liObj_t *o, const char *name, liflag_t flags );
 
 
 

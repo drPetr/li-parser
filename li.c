@@ -149,7 +149,11 @@ size_t Int64ToStr( int64_t val, char *str, int base ) {
                    allocator
 ================================================
 */
-
+int allocCalls = 0;
+int allocTyidStrCalls = 0;
+int allocTyidNodeCalls = 0;
+int deallocCalls = 0;
+int reallocCalls = 0;
 /*
 ============
 LiDefaultAlloc
@@ -165,7 +169,15 @@ pointer to memory block
 ============
 */
 static void *LiDefaultAlloc( size_t size, lityid_t type ) {
-    liunused( type );    
+    //liunused( type );    
+    allocCalls++;
+    if( type == LI_TYID_STR ) {
+        allocTyidStrCalls++;
+    } else if( type == LI_TYID_NODE ) {
+        allocTyidNodeCalls++;
+    } else {
+        liverifya( 0, "error: unknown typeid [%d]", type );
+    }
     return malloc( size );
 }
 
@@ -181,6 +193,7 @@ pointer to new memory block
 */
 static void *LiDefaultRealloc( void *ptr, size_t size, lityid_t type ) {
     liunused( type );
+    reallocCalls++;
     return realloc( ptr, size );
 }
 
@@ -193,6 +206,7 @@ allocated. The standard free function is used
 ============
 */
 static void LiDefaultFree( void* ptr ) {
+    deallocCalls++;
     free( ptr );
 }
 
@@ -547,22 +561,72 @@ static void LiInsertionHelper( liObj_t *left, liObj_t *right,
     /* first node in the insert sequence */
     liObj_t *firstInsert = insert;
     /* last node in the insert sequence */
-    liObj_t *lastInsert = NULL;
-    liObj_t *tmp = insert;
+    liObj_t *lastInsert = insert;
     
     liassert( left || right || parent );
     liassert( insert );
 
+#if !defined(LI_NODBG) && defined(DEBUG)
+    liassert( insert != parent );
+    liassert( insert != left );
+    liassert( insert != right );
+    liassert( insert->parent == NULL );
+    if( left && right ) {
+        liassert( left->parent == right->parent );
+        liassert( left->next == right );
+        liassert( right->prev == left );
+        liassert( left != right );
+    }
+    if( parent ) {
+        int chk;
+        liObj_t *it;
+        
+        liassert( parent != left );
+        liassert( parent != right );
+        
+        /* check left */
+        if( left ) {
+            liassert( left->parent == parent );
+            chk = 0;
+            it = parent->firstChild;
+            while( it ) {
+                if( it == left ) {
+                    chk = 1;
+                    break;
+                }
+                it = it->next;
+            }
+            liasserta( chk, "error: left." );
+        }
+        
+        /* check right */
+        if( right ) {
+            liassert( right->parent == parent );
+            chk = 0;
+            it = parent->firstChild;
+            while( it ) {
+                if( it == right ) {
+                    chk = 1;
+                    break;
+                }
+                it = it->next;
+            }
+            liasserta( chk, "error: right." );
+        }
+    }
+#endif
+
     /* set the whole sibling sequence of the parent and get a
     pointer to the last node of the sibling sequence */
-    while( tmp ) {
-        lastInsert = tmp;
-        tmp->parent = parent;
-        tmp = tmp->next;
+    insert->parent = parent;
+    while( lastInsert->next ) {
+        lastInsert = lastInsert->next;
+        lastInsert->parent = parent;
     }
     
     while( firstInsert->prev ) {
         firstInsert = firstInsert->prev;
+        firstInsert->parent = parent;
     }
 
     /* restoring "family" relations */
@@ -601,6 +665,8 @@ Insert an insert node as the first child of a node
 void LiInsertFirstChild( liObj_t *node, liObj_t *insert ) {
     liassert( node );
     liassert( insert );
+    liassert( node->type == LI_VTOBJ );
+    liassert( insert->type != LI_VTUNDEF );
     LiInsertionHelper( NULL, node->firstChild, node, insert );
 }
 
@@ -614,6 +680,8 @@ Insert the insert node as the last child of the node
 void LiInsertLastChild( liObj_t *node, liObj_t *insert ) {
     liassert( node );
     liassert( insert );
+    liassert( node->type == LI_VTOBJ );
+    liassert( insert->type != LI_VTUNDEF );
     LiInsertionHelper( node->lastChild, NULL, node, insert );
 }
 
@@ -627,6 +695,8 @@ Insert an insert node before the node
 void LiInsertBefore( liObj_t *node, liObj_t *insert ) {
     liassert( node );
     liassert( insert );
+    liassert( node->type != LI_VTUNDEF );
+    liassert( insert->type != LI_VTUNDEF );
     LiInsertionHelper( node->prev, node, node->parent, insert );
 }
 
@@ -640,39 +710,53 @@ Insert an insert node after a node
 void LiInsertAfter( liObj_t *node, liObj_t *insert ) {
     liassert( node );
     liassert( insert );
+    liassert( node->type != LI_VTUNDEF );
+    liassert( insert->type != LI_VTUNDEF );
     LiInsertionHelper( node, node->next, node->parent, insert );
 }
 
 /*
-====================
+============
 LiInsertFirst
 
 Insert the insert node first in the sequence node
-====================
+============
 */
 void LiInsertFirst( liObj_t *node, liObj_t *insert ) {
     liassert( node );
     liassert( insert );
+    liassert( node->type != LI_VTUNDEF );
+    liassert( insert->type != LI_VTUNDEF );
     
-    while( node->prev ) {
-        node = node->prev;
+    if( node->parent ) {
+        node = node->parent->firstChild;
+    } else {
+        while( node->prev ) {
+            node = node->prev;
+        }
     }
     LiInsertionHelper( NULL, node, node->parent, insert );
 }
 
 /*
-====================
+============
 LiInsertLast
 
 Insert the insert node as the last node in the sequence
-====================
+============
 */
 void LiInsertLast( liObj_t *node, liObj_t *insert ) {
     liassert( node );
     liassert( insert );
+    liassert( node->type != LI_VTUNDEF );
+    liassert( insert->type != LI_VTUNDEF );
     
-    while( node->next ) {
-        node = node->next;
+    if( node->parent ) {
+        node = node->parent->lastChild;
+    } else {
+        while( node->next ) {
+            node = node->next;
+        }
     }
     LiInsertionHelper( node, NULL, node->parent, insert );
 }
@@ -834,21 +918,57 @@ liObj_t *LiNodeCreate( void ) {
 LiNodeFreeSubtreeHelper_r
 ============
 */
-static void LiNodeFreeSubtreeHelper_r( liObj_t *node ) {
+static void LiNodeFreeSubtreeHelper_r( liObj_t *node, int level ) {
     liObj_t *next;
 
     liassert( node );
+    liverifya( level <= LI_MAX_NESTING_LEVEL,
+        "error: the nesting level is too high. "
+        "check the tree for looping levels or increase "
+        "the constant LI_MAX_NESTING_LEVEL. "
+        "LI_MAX_NESTING_LEVEL=%d", LI_MAX_NESTING_LEVEL );
 
     do {
         next = node->next;
         if( node->firstChild ) {
-            /* free array of values */
-            // TODO if( node->values ) {
-                //LiValArrayFree( node->values );
-            //}
-            /* free node */
-            LiNodeFreeSubtreeHelper_r( node->firstChild );
+            /* free subtree */
+            LiNodeFreeSubtreeHelper_r( node->firstChild, level + 1 );
         }
+        
+        /* free key */
+        if( node->key ) {
+            LiStrFree( node->key );
+        }
+        
+        /* free object value */
+        switch( node->type ) {
+            case LI_VTUNDEF:
+                break;
+            case LI_VTNULL:
+                break;
+            case LI_VTOBJ:
+                /* removal is done below */
+                break;
+                
+            case LI_VTSTR:
+                if( node->vstr ) {
+                    LiStrFree( node->vstr );
+                }
+                break;
+                
+            case LI_VTINT:
+                break;
+            case LI_VTUINT:
+                break;
+            case LI_VTBOOL:
+                break;
+                
+            default:
+                liverifya( 0, "error: unknown object type [%d]", 
+                        node->type );
+                break;
+        }
+        
         LiDealloc( node );
         node = next;
     } while( node );
@@ -863,7 +983,7 @@ void LiFreeSubtree( liObj_t *node ) {
     liassert( node );
     node = LiExtract( node );
     liassert( node );
-    LiNodeFreeSubtreeHelper_r( node );
+    LiNodeFreeSubtreeHelper_r( node, 0 );
 }
 
 /*
@@ -877,7 +997,7 @@ void LiFree( liObj_t *li ) {
     while( li->parent ) {
         li = li->parent;
     }
-    LiNodeFreeSubtreeHelper_r( li );
+    LiNodeFreeSubtreeHelper_r( li, 0 );
 }
 
 
@@ -1062,15 +1182,23 @@ static licode_t LiWriteLiStr( liFile_t f, fnLiWrite wr, liStr_t *s ) {
 LiWriteHelper_r
 ============
 */
-static void LiWriteHelper_r( liFile_t f, fnLiWrite wr, liObj_t *o,
-        int indent, liflag_t flags ) {
-    int nonl = 0;
+static licode_t LiWriteHelper_r( liFile_t f, fnLiWrite wr, 
+        liObj_t *o, liflag_t flags, int level ) {
+    licode_t code = LI_OK;
+    int nl = 1;
+    
+    liverifya( level <= LI_MAX_NESTING_LEVEL,
+        "error: the nesting level is too high. "
+        "check the tree for looping levels or increase "
+        "the constant LI_MAX_NESTING_LEVEL. "
+        "LI_MAX_NESTING_LEVEL=%d", LI_MAX_NESTING_LEVEL );
+    
     do {
-        if( !nonl ) {
-            LiWriteIndent( f, wr, indent );
+        if( nl ) {
+            LiWriteIndent( f, wr, level );
         }
         
-        nonl = 0;
+        nl = 1;
         
         /* write key */
         if( o->key ) {
@@ -1080,7 +1208,7 @@ static void LiWriteHelper_r( liFile_t f, fnLiWrite wr, liObj_t *o,
             LiWriteCstr( f, wr, ", " );
         }
         if( o->next && (o->next->key == NULL) ) {
-            nonl = 1;
+            nl = 0;
         }
         
         switch( o->type ) {
@@ -1093,9 +1221,12 @@ static void LiWriteHelper_r( liFile_t f, fnLiWrite wr, liObj_t *o,
                 if( o->firstChild ) {
                     /* begin of object */
                     LiWriteCstr( f, wr, "{\n" );
-                    LiWriteHelper_r( f, wr, o->firstChild, 
-                            indent + 1, flags );
-                    LiWriteIndent( f, wr, indent );
+                    code = LiWriteHelper_r( f, wr, o->firstChild, 
+                            flags, level + 1 );
+                    if( code != LI_OK ) {
+                        return code;
+                    }
+                    LiWriteIndent( f, wr, level );
                     /* end of object */
                     LiWriteCstr( f, wr, "}" );
                 } else {
@@ -1142,11 +1273,13 @@ static void LiWriteHelper_r( liFile_t f, fnLiWrite wr, liObj_t *o,
                 liverifya( 0, "error: nuknown object type [%d]", o->type );
         }
         
-        if( !nonl ) {
+        if( nl ) {
             LiWriteCstr( f, wr, "\n" );
         }
         
     } while( (o = o->next) != NULL );
+    
+    return code;
 }
 
 /*
@@ -1154,10 +1287,11 @@ static void LiWriteHelper_r( liFile_t f, fnLiWrite wr, liObj_t *o,
 LiWrite
 ============
 */
-void LiWrite( liIO_t *io, liObj_t *o, const char *name, liflag_t flags ) {
+licode_t LiWrite( liIO_t *io, liObj_t *o, const char *name, liflag_t flags ) {
     liassert( o );
     
     liFile_t f;
+    licode_t code = LI_OK;
     
     if( io == NULL ) {
         io = &liDefaultIO;
@@ -1165,7 +1299,9 @@ void LiWrite( liIO_t *io, liObj_t *o, const char *name, liflag_t flags ) {
     
     f = io->open( name, 'w' );
     if( o ) {
-        LiWriteHelper_r( f, io->write, o, 0, flags );
+        code = LiWriteHelper_r( f, io->write, o, flags, 0 );
     }
     io->close( f );
+    
+    return code;
 }

@@ -40,6 +40,8 @@
 #define li_write            LiWrite
 
 
+
+
 liobj *mcom( const char *id, const char *exe ) {
     liobj *c, *o;
     
@@ -68,6 +70,7 @@ liobj *mcom0( const char *id, const char *exe ) {
     
     return c;
 }
+
 
 liobj *MakeExample1( void ) {
     liobj *root = NULL;
@@ -149,8 +152,7 @@ liobj *MakeExample1( void ) {
     li_ins_last_child( o, mcom( "kb_sprint", "sprint_toggle" ) );
     li_ins_last_child( o, mcom( "kb_left_lookout", "llookout" ) );
     li_ins_last_child( o, mcom( "kb_right_lookout", "rlookout" ) );
-    
-    
+
     
     o = li_obj();
     li_ins_last_child( root, o );
@@ -177,14 +179,12 @@ liobj *MakeExample1( void ) {
     li_ins_last_child( o, mcom( "kb_firemode_prev", "wpn_firemode_prev" ) );
     
     
-    
     o = li_obj();
     li_ins_last_child( root, o );
     
     li = li_cs( "kb_grp_inventory" );
     li_setkey_cs( li, "name" );
     li_ins_last_child( o, li );
-    
     
     
     li_ins_last_child( o, mcom0( "kb_inventory", "inventory" ) );
@@ -245,14 +245,16 @@ liobj *MakeExample1( void ) {
 }
 
 
-
+extern int allocCalls;
+extern int deallocCalls;
+extern int reallocCalls;
+extern int allocTyidStrCalls;
+extern int allocTyidNodeCalls;
 
 int main( int argc, char **argv ) {
     clock_t start = clock();
     
     liobj   *li = MakeExample1();
-    
-    
     
     li_write( NULL, li, "out/out.li", 0 );
     
@@ -260,7 +262,13 @@ int main( int argc, char **argv ) {
     
     clock_t stop = clock();
     double d = (double)(stop - start) / CLOCKS_PER_SEC;
-    printf( "Loop required %f seconds", d );
+    
+    printf( "Alloc calls [%d]\n", allocCalls );
+    printf( "Alloc tyid str calls [%d]\n", allocTyidStrCalls );
+    printf( "Alloc tyid node calls [%d]\n", allocTyidNodeCalls );
+    printf( "Realloc calls [%d]\n", reallocCalls );
+    printf( "Dealloc calls [%d]\n", deallocCalls );
+    printf( "Loop required %f seconds\n", d );
     
     return 0;
 }
