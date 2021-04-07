@@ -6,7 +6,7 @@ keybingidg = {
             { id = "kb_left" exe = "left" },
             { id = "kb_right" exe = "right" },
             { id = "kb_up" exe = "up" },
-            { id = "kb_down" exe="down" }
+            { id = "kb_down" exe = "down" }
     }, {
         name = "kb_grp_movement"
         command = 
@@ -83,6 +83,75 @@ keybingidg = {
             { id = "speech_menu_personal" exe = "speech_menu_1" }
     }
 }
+
+
+
+
+group = {
+    name = "kb_grp_direction"
+    name = "kb_grp_direction2"
+    name = "kb_grp_direction3" 
+    command = { 
+        id = "kb_left"
+        exe = "left"
+    }
+    command = {
+        id = "kb_right"
+        exe = "right"
+    }
+    command = {
+        id = "kb_up"
+        exe = "up"
+    }
+    command = {
+        id = "kb_down"
+        exe = "down"
+    }
+}
+
+group1 = {
+    name = "kb_grp_direction", "kb_grp_direction2", "kb_grp_direction3"
+    command = { 
+        id = "kb_left"
+        exe = "left"
+    }, {
+        id = "kb_right"
+        exe = "right"
+    }, {
+        id = "kb_up"
+        exe = "up"
+    }, {
+        id = "kb_down"
+        exe="down"
+    }
+}
+
+group[name,command[id,exe]] = {
+    "kb_grp_direction", "kb_grp_direction2", "kb_grp_direction3"
+    {
+        "kb_left"
+        "left"
+    }, {
+        "kb_right"
+        "right"
+    }, {
+        "kb_up"
+        "up"
+    }, {
+        "kb_down"
+        "down"
+    }
+}
+
+group={name="kb_grp_direction"name="kb_grp_direction2"name="kb_grp_direction3"command={id="kb_left"exe="left"}command={id="kb_right"exe="right"}command={id="kb_up"exe="up"}command={id="kb_down"exe="down"}}
+
+group={name="kb_grp_direction","kb_grp_direction2","kb_grp_direction3"command={id="kb_left"exe="left"},{id="kb_right"exe="right"},{id="kb_up"exe="up"},{id="kb_down"exe="down"}}
+
+group[name,command[id,exe]]={"kb_grp_direction","kb_grp_direction2","kb_grp_direction3"{"kb_left""left"},{"kb_right""right"},{"kb_up""up"},{"kb_down""down"}}
+
+
+
+
 
 keybingidg[a_null,group[name,command[id,exe]]] = {
     null
