@@ -26,13 +26,13 @@
 #define li_free             LiFree
 
 #define liobj               liObj_t
-#define li_setkey           LiSetKeyStr
-#define li_setkey_cs        LiSetKeyCstr
+#define li_setkey           LiSetKeyL
+#define li_setkey_cs        LiSetKey
 #define li_setflags         LiSetFlags
 #define li_obj              LiObj
 #define li_null             LiNull
-#define li_s                LiStr
-#define li_cs               LiCstr
+#define li_s                LiStrL
+#define li_cs               LiStr
 #define li_int              LiInt
 #define li_uint             LiUint
 #define li_bool             LiBool
@@ -255,13 +255,49 @@ liobj *MakeExample1( void ) {
     return root;
 }
 
-extern int allocCalls;
-extern int deallocCalls;
-extern int reallocCalls;
-extern int allocTyidStrCalls;
-extern int allocTyidNodeCalls;
 
 libool_t LiIsCorrectRefStr( const char *s ) ;
+
+/*
+li_inslastchild(  )
+li_insfirstchild
+li_firstchild
+
+LiNext
+LiPrev
+LiParent
+LiFirstChild
+LiLastChild
+
+li_next()
+li_prev()
+li_parent()
+*/
+#include <stdlib.h>
+
+size_t my( uint16_t *str ) {
+    uint64_t himagic = 0x8000800080008000L;
+    uint64_t lomagic = 0x0001000100010001L;
+    uint16_t *longword_ptr = str;
+    
+    for(;;) {
+        uint64_t longword = *longword_ptr++;
+
+        if(((longword - lomagic) & ~longword & himagic) != 0) {
+          
+          uint16_t *cp = (uint16_t *) (longword_ptr - 1);
+
+          if (cp[0] == 0)
+            return cp - str;
+          if (cp[1] == 0)
+            return cp - str + 1;
+          if (cp[2] == 0)
+            return cp - str + 2;
+          if (cp[3] == 0)
+            return cp - str + 3;
+        }
+    }
+}
 
 int main( int argc, char **argv ) {
     clock_t start = clock();
@@ -275,7 +311,7 @@ int main( int argc, char **argv ) {
     clock_t stop = clock();
     double d = (double)(stop - start) / CLOCKS_PER_SEC;
     
-    const char *s = ".key";//".keybingidg.group.name";
+    const char *s = ".keybingidg.group.command.exe";
     
     
     printf( "Pattern [%s]\n", s );
@@ -285,7 +321,7 @@ int main( int argc, char **argv ) {
     do {
         if( ret == LI_OK ) {
             if( dat.obj->vstr ) {
-                printf( "found data: %s\n", dat.obj->vstr->str );
+                printf( "found data: %s\n", sstr(dat.obj->vstr) );
             }
         } else {
             printf( "ret: [%d]\n", ret );
@@ -294,12 +330,8 @@ int main( int argc, char **argv ) {
     } while( (ret = LiFindNext( &dat )) == LI_OK );
     
     
-    printf( "Alloc calls [%d]\n", allocCalls );
-    printf( "Alloc tyid str calls [%d]\n", allocTyidStrCalls );
-    printf( "Alloc tyid node calls [%d]\n", allocTyidNodeCalls );
-    printf( "Realloc calls [%d]\n", reallocCalls );
-    printf( "Dealloc calls [%d]\n", deallocCalls );
     printf( "Loop required %f seconds\n", d );
+    
     
     li_free( li );
     
