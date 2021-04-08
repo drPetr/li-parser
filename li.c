@@ -1,684 +1,6 @@
 #include "li.h"
-
-#include <string.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <stdio.h>
-
-
-
-#define LI_ID_MAX_LEN       127
-#define LI_STR_MAX_LEN      4095
-#define PTRSIZE             (sizeof(void*))
-
-#define liunused(a)         ((void)a)
-
-
-
-/*
-============
-__impl_liverifya
-============
-*/
-static void __impl_liverifya( int e, const char* expr, const char* file, 
-        int line, const char *function, const char* fmt, ... ) {
-    va_list args;
-    if( !e ){
-        va_start( args, fmt );
-        fprintf( stderr, "verification failed: %s\n", expr );
-        fprintf( stderr, "file: %s\n", file );
-        fprintf( stderr, "line: %d\n", line );
-        fprintf( stderr, "function: %s\n", function );
-        if( fmt ) {
-            vfprintf( stderr, fmt, args );
-        }
-        va_end( args );
-        exit(1);
-    }
-}
-
-#define liverify(e)                                 \
-    __impl_liverifya( (int)(!!(e)), #e, __FILE__,   \
-    __LINE__, __FUNCTION__, NULL )
-
-#define liverifya(e,a,...)                          \
-    __impl_liverifya( (int)(!!(e)), #e, __FILE__,   \
-    __LINE__, __FUNCTION__, a, ##__VA_ARGS__ )
-
-
-
-#if defined(LI_NODBG) || (!defined(DEBUG))
-    #define onlydebug(act)
-    #define liassert(e)
-    #define liasserta(e,a,...)
-#else
-
-/*
-============
-__impl_liasserta
-============
-*/
-static void __impl_liasserta( int e, const char* expr, const char* file, 
-        int line, const char *function, const char* fmt, ... ) {
-    va_list args;
-    if( !e ){
-        va_start( args, fmt );
-        fprintf( stderr, "assertion failed: %s\n", expr );
-        fprintf( stderr, "file: %s\n", file );
-        fprintf( stderr, "line: %d\n", line );
-        fprintf( stderr, "function: %s\n", function );
-        if( fmt ) {
-            vfprintf( stderr, fmt, args );
-        }
-        va_end( args );
-        exit(1);
-    }
-}
-
-    #define onlydebug(act)  act
-
-    #define liassert(e)                                 \
-        __impl_liasserta( (int)(!!(e)), #e, __FILE__,   \
-        __LINE__, __FUNCTION__, NULL )
-        
-    #define liasserta(e,a,...)                          \
-        __impl_liasserta( (int)(!!(e)), #e, __FILE__,   \
-        __LINE__, __FUNCTION__, a, ##__VA_ARGS__ )
-
-#endif
-
-libool_t __charis( char c, uint8_t flag ) {
-    uint8_t i = *((uint8_t*)(void*)(&c));
-    static const char flags[256] = {
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
-        0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03,
-        0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03,
-        0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03,
-        0x03, 0x03, 0x03, 0x00, 0x00, 0x00, 0x00, 0x03,
-        0x00, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03,
-        0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03,
-        0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03, 0x03,
-        0x03, 0x03, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-    };
-    
-    return !!(flags[i] & flag);
-}
-
-#define is_firstkeych(c)    __charis( c, 0x02 )
-#define is_nextkeych(c)     __charis( c, 0x01 )
-
-
-/*
-============
-CeilPow2
-============
-*/
-uint32_t CeilPow2( uint32_t v ) {
-    v--;
-    v |= v >> 1;
-    v |= v >> 2;
-    v |= v >> 4;
-    v |= v >> 8;
-    v |= v >> 16;
-    v++;
-    return v;
-}
-
-/*
-============
-UInt64ToStr
-============
-*/
-size_t UInt64ToStr( uint64_t val, char *str, int base ) {
-    static const char alpha[] = "0123456789abcdefghijklmnopqrstuvwxyz";
-    char *p = str;
-    uint8_t digits[64]; /* value digits */
-    int dig = 0;        /* amount of digits */
-    
-    liassert( base >= 2 );
-    liassert( base <= 36 );
-    
-    /* calculate digits */
-    do {
-        digits[dig++] = (uint8_t)(val % base);
-        val /= base;
-    } while( val );
-    
-    /* copy the flipped digits to the output buffer */
-    do {
-        *p++ = alpha[ digits[--dig] ];
-    } while( dig > 0 );
-    *p = 0;
-    
-    return (size_t)(p - str);
-}
-
-/*
-============
-Int64ToStr
-============
-*/
-size_t Int64ToStr( int64_t val, char *str, int base ) {
-    liassert( base >= 2 );
-    liassert( base <= 36 );
-    
-    /* check for negative value */
-    if( val < 0 ) {
-        *str++ = '-';
-        return UInt64ToStr( (uint64_t)(-val), str, base ) + 1;
-    }
-    return UInt64ToStr( (uint64_t)val, str, base );
-}
-
-
-
-/*
-================================================
-                   allocator
-================================================
-*/
-int allocCalls = 0;
-int allocTyidStrCalls = 0;
-int allocTyidNodeCalls = 0;
-int deallocCalls = 0;
-int reallocCalls = 0;
-/*
-============
-LiDefaultAlloc
-
-Default function for memory allocation. The function
-allocates memory of size "size" for the type under
-the identifier "type". The function returns a pointer
-to a block of memory. Standard malloc is used for
-allocation.
-
-return values:
-pointer to memory block
-============
-*/
-static void *LiDefaultAlloc( size_t size, lityid_t type ) {
-    //liunused( type );    
-    allocCalls++;
-    if( type == LI_TYID_STR ) {
-        allocTyidStrCalls++;
-    } else if( type == LI_TYID_NODE ) {
-        allocTyidNodeCalls++;
-    } else if( type == LI_TYID_ARR ) {
-        
-    } else {
-        liverifya( 0, "error: unknown typeid [%d]", type );
-    }
-    return malloc( size );
-}
-
-/*
-============
-LiDefaultRealloc
-
-Default function for memory reallocation.
-
-return values:
-pointer to new memory block
-============
-*/
-static void *LiDefaultRealloc( void *ptr, size_t size, lityid_t type ) {
-    liunused( type );
-    reallocCalls++;
-    return realloc( ptr, size );
-}
-
-/*
-============
-LiDefaultFree
-
-Removes a block of memory that was previously
-allocated. The standard free function is used
-============
-*/
-static void LiDefaultFree( void* ptr ) {
-    deallocCalls++;
-    free( ptr );
-}
-
-static liAlloc_t liDefaultAllocator = { 
-    LiDefaultAlloc,
-    LiDefaultRealloc,
-    LiDefaultFree
-};
-
-static liAlloc_t *liAllocator = &liDefaultAllocator;
-
-/*
-============
-LiAlloc
-============
-*/
-static void *LiAlloc( size_t size, lityid_t type ) {
-    liassert( liAllocator );
-    liassert( liAllocator->alloc );
-    liassert( size != 0 );
-    
-    return liAllocator->alloc( size, type );
-}
-
-/*
-============
-LiRealloc
-============
-*/
-static void *LiRealloc( void *ptr, size_t size, lityid_t type ) {
-    liassert( liAllocator );
-    liassert( liAllocator->realloc );
-    liassert( size != 0 );
-    liassert( ptr );
-    
-    return liAllocator->realloc( ptr, size, type );
-}
-
-/*
-============
-LiDealloc
-============
-*/
-static void LiDealloc( void *ptr ) {
-    liassert( liAllocator );
-    liassert( liAllocator->free );
-    liassert( ptr );
-    
-    liAllocator->free( ptr );
-}
-
-/*
-============
-LiSetAllocator
-
-set allocator interface
-============
-*/
-void LiSetAllocator( liAlloc_t *alloc ) {
-    liassert( alloc );
-    liassert( alloc->alloc );
-    liassert( alloc->free );
-    
-    liAllocator = alloc;
-}
-
-/*
-============
-LiGetAllocator
-============
-*/
-liAlloc_t *LiGetAllocator( void ) {
-    return liAllocator;
-}
-
-
-
-/*
-================================================
-                li input/output
-================================================
-*/
-
-/*
-============
-LiDefaultOpen
-============
-*/
-static liFile_t LiDefaultOpen( const char* fileName, char openMode ) {
-    liverify( openMode == 'r' || openMode == 'w' ); /* read/write mode */
-    liassert( fileName );
-    liassert( fileName[0] );
-
-    switch( openMode ) {
-        case 'r':
-            return (liFile_t)fopen( fileName, "rb" );
-        case 'w':
-            return (liFile_t)fopen( fileName, "wb" );
-    }
-    
-    return NULL;
-}
-
-/*
-============
-LiDefaultClose
-============
-*/
-static void LiDefaultClose( liFile_t file ) {
-    liassert( file );
-    
-    fclose( (FILE*)file );
-}
-
-/*
-============
-LiDefaultRead
-============
-*/
-static ssize_t LiDefaultRead( void* dst, size_t size, liFile_t file ) {
-    liassert( dst );
-    liassert( file );
-    
-    size_t outSize;
-    
-    outSize = fread( dst, 1, size, (FILE*)file );
-    if( outSize != size && !feof( (FILE*)file ) ) {
-        return -(ssize_t)outSize;
-    }
-    
-    return (ssize_t)outSize;
-}
-
-/*
-============
-LiDefaultWrite
-============
-*/
-static ssize_t LiDefaultWrite( const void* src, size_t size, liFile_t file ) {
-    liassert( src );
-    liassert( file );
-    
-    size_t outSize;
-    
-    outSize = fwrite( src, 1, size, (FILE*)file );
-    if( outSize != size && !feof( (FILE*)file ) ) {
-        return -(ssize_t)outSize;
-    }
-    
-    return (ssize_t)outSize;
-}
-
-static liIO_t liDefaultIO = {
-    LiDefaultOpen,
-    LiDefaultClose,
-    LiDefaultRead,
-    LiDefaultWrite
-};
-
-
-
-/*
-================================================
-                    li string
-================================================
-*/
-
-/*
-============
-LiStrAlloc
-============
-*/
-liStr_t *LiStrAlloc( uint32_t siz ) {
-    liStr_t *s;
-    
-    liassert( siz >= 1 );
-    
-    /* siz = CeilPow2( siz ); */
-    s = LiAlloc( sizeof(liStr_t) + siz, LI_TYID_STR );
-    s->len = 0;
-    s->alloced = siz;
-    if( siz ) {
-        s->str[0] = 0;
-    }
-    
-    return s;
-}
-
-/*
-============
-LiStrRealloc
-============
-*/
-liStr_t *LiStrRealloc( liStr_t *s, uint32_t siz ) {
-    liassert( s );
-    liassert( siz >= 1 );
-    
-    siz = CeilPow2( siz );
-    if( s->alloced == siz ) {
-        return s;
-    }
-    s = LiRealloc( s, sizeof(liStr_t) + siz, LI_TYID_STR );
-    s->alloced = siz;
-    if( s->len >= siz ) {
-        s->len = siz - 1;
-        s->str[ s->len ] = 0;
-    }
-    
-    return s;
-}
-
-/*
-============
-LiStrFree
-============
-*/
-void LiStrFree( liStr_t *s ) {
-    liassert( s );
-    LiDealloc( s );
-}
-
-/*
-============
-LiStrCreate
-============
-*/
-liStr_t *LiStrCreate( const char *str, uint32_t len ) {
-    liStr_t *s;
-    
-    liassert( str );
-    
-    s = LiStrAlloc( len + 1 );
-    
-    if( len ) {
-        s->len = len;
-        memcpy( s->str, str, len );
-        s->str[len] = 0;
-    }
-    
-    return s;
-}
-
-/*
-============
-LiStrCreateCstr
-============
-*/
-liStr_t *LiStrCreateCstr( const char *cstr ) {
-    return LiStrCreate( cstr, (uint32_t)strlen(cstr) );
-}
-
-/*
-============
-LiStrConcat
-============
-*/
-void LiStrConcat( liStr_t **s, const char *cstr, uint32_t len ) {
-    liStr_t *str;
-    
-    liassert( cstr );
-    liassert( s );
-    liassert( *s );
-    
-    if( !len ) {
-        return;
-    }
-    
-    /* check if additional memory is needed */
-    str = *s;
-    if( str->len + len > str->alloced ) {
-        str = LiStrRealloc( str, str->len + len + 1 );
-        *s = str;
-    }
-    
-    /* copy substring */
-    memcpy( &(str->str[str->len]), cstr, len );
-    str->len += len;
-    str->str[str->len] = 0;
-}
-
-/*
-============
-LiStrConcatCstr
-============
-*/
-void LiStrConcatCstr( liStr_t **s, const char *cstr ) {
-    liassert( cstr );
-    liassert( s );
-    liassert( *s );
-    
-    LiStrConcat( s, cstr, (uint32_t)strlen(cstr) );
-}
-
-/*
-============
-LiStrSet
-============
-*/
-void LiStrSet( liStr_t **s, const char *cstr, uint32_t len ) {
-    liassert( cstr );
-    liassert( s );
-    
-    if( *s == NULL ) {
-        *s = LiStrAlloc( len );
-    } else {
-        *s = LiStrRealloc( *s, len );
-    }
-    /* copy string */
-    memcpy( (*s)->str, cstr, len );
-    (*s)->len = len;
-    (*s)->str[len] = 0;
-}
-
-/*
-============
-LiStrSetCstr
-============
-*/
-void LiStrSetCstr( liStr_t **s, const char *cstr ) {
-    liassert( cstr );
-    liassert( s );
-    
-    LiStrSet( s, cstr, (uint32_t)strlen(cstr) );
-}
-
-
-
-/*
-================================================
-                    li value
-================================================
-*/
-    
-/*
-============
-LiArrayAlloc
-============
-*/
-liArray_t *LiArrayAlloc( uint32_t siz, uint32_t num ) {
-    liArray_t *array;
-    
-    liassert( siz >= 1 );
-    liassert( num >= 1 );
-    
-    uint32_t memSize = sizeof(liArray_t) + siz * num;
-    array = (liArray_t*)LiAlloc( memSize, LI_TYID_ARR );
-    array->allocedNum = num;
-    array->siz = siz;
-    array->num = 0;
-    
-    return array;
-}
-
-/*
-============
-LiArrayRealloc
-============
-*/
-liArray_t *LiArrayRealloc( liArray_t *array, uint32_t num ) {
-    liassert( array );
-    liassert( num >= 1 );
-    
-    num = CeilPow2( num );
-    /* need to re-allocate memory? */
-    if( num == array->allocedNum ) {
-        /* no need to reallocate memory */
-        return array;
-    }
-    
-    /* reallocate */
-    uint32_t memSize = sizeof(liArray_t) + array->siz * num;
-    array = (liArray_t*)LiRealloc( array, memSize, LI_TYID_ARR );
-    array->allocedNum = num;
-    if( array->allocedNum > array->num ) {
-        array->num = array->allocedNum;
-    }
-    
-    return array;
-}
-
-/*
-============
-LiArrayFree
-============
-*/
-void LiArrayFree( liArray_t *array ) {
-    liassert( array );
-    LiDealloc( array );
-}
-
-/*
-============
-LiArrayEmpty
-============
-*/
-void LiArrayEmpty( liArray_t *array ) {
-    liassert( array );
-    array->num = 0;
-}
-
-/*
-============
-LiArrayAppend
-============
-*/
-liArray_t *LiArrayAppend( liArray_t *array, void *data ) {
-    liassert( array );
-    liassert( data );
-    
-    /* check the size of available memory */
-    if( array->num + 1 > array->allocedNum ) {
-        array = LiArrayRealloc( array, array->num + 1 );
-    }
-    
-    /* copy data to array */
-    memcpy( array->array + (array->num * array->siz), data, array->siz );
-    array->num += 1;
-    return array;
-}
+#include "liassert.h"
+#include "liutil.h"
 
 
 
@@ -1090,7 +412,7 @@ static void LiNodeFreeSubtreeHelper_r( liObj_t *node, int level ) {
         
         /* free key */
         if( node->key ) {
-            LiStrFree( node->key );
+            LiSFree( node->key );
         }
         
         /* free object value */
@@ -1105,7 +427,7 @@ static void LiNodeFreeSubtreeHelper_r( liObj_t *node, int level ) {
                 
             case LI_VTSTR:
                 if( node->vstr ) {
-                    LiStrFree( node->vstr );
+                    LiSFree( node->vstr );
                 }
                 break;
                 
@@ -1166,7 +488,7 @@ void LiFree( liObj_t *li ) {
 LiIsCorrectKey
 ============
 */
-libool_t LiIsCorrectKey( const char *s, uint32_t len ) {
+libool_t LiIsCorrectKey( const char *s, lisize_t len ) {
     if( len ) {
         if( !is_firstkeych(*s) ) {
             return lifalse;
@@ -1211,34 +533,34 @@ libool_t LiIsCorrectRefStr( const char *s ) {
 
 /*
 ============
-LiSetKeyStr
+LiSetKey
 ============
 */
-void LiSetKeyStr( liObj_t *o, const char *key, uint32_t len ) {
+void LiSetKey( liObj_t *o, const char *key ) {
+    liassert( o );
+    LiSetKeyL( o, key, key ? (lisize_t)StrLen(key) : 0 );
+}
+
+/*
+============
+LiSetKeyL
+============
+*/
+void LiSetKeyL( liObj_t *o, const char *key, lisize_t len ) {
     liassert( o );
     if( !key ) {
         if( o->key ) {
-            LiStrFree( o->key );
+            LiSFree( o->key );
             o->key = NULL;
         }
     } else {
         liassert( LiIsCorrectKey( key, len ) );
         if( o->key ) {
-            LiStrSet( &(o->key), key, len );
+            o->key = LiSSetL( o->key, key, len );
         } else {
-            o->key = LiStrCreate( key, len );
+            o->key = LiSNewL( key, len );
         }
     }
-}
-
-/*
-============
-LiSetKeyCstr
-============
-*/
-void LiSetKeyCstr( liObj_t *o, const char *key ) {
-    liassert( o );
-    LiSetKeyStr( o, key, key ? (uint32_t)strlen(key) : 0 );
 }
 
 /*
@@ -1298,21 +620,20 @@ liObj_t *LiNull( void ) {
 LiStr
 ============
 */
-liObj_t *LiStr( const char *s, uint32_t len ) {
-    liassert( s );
-    liObj_t *o = LiNodeCreate();
-    o->type = LI_VTSTR;
-    o->vstr = s ? LiStrCreate( s, len ) : NULL;
-    return o;
+liObj_t *LiStr( const char *s ) {
+    return LiStrL( s, s ? (lisize_t)StrLen(s) : 0 );
 }
 
 /*
 ============
-LiCstr
+LiStrL
 ============
 */
-liObj_t *LiCstr( const char *s ) {
-    return LiStr( s, s ? (uint32_t)strlen(s) : 0 );
+liObj_t *LiStrL( const char *s, lisize_t len ) {
+    liObj_t *o = LiNodeCreate();
+    o->type = LI_VTSTR;
+    o->vstr = s ? LiSNewL( s, len ) : NULL;
+    return o;
 }
 
 /*
@@ -1353,9 +674,10 @@ liObj_t *LiBool( libool_t b ) {
 
 
 
-struct parsedPatternData_s{
+struct patternData_s{
     const char      *str;
-    uint32_t        len;
+    lisize_t        len;
+    libool_t        checked;
 };
 
 /*
@@ -1369,20 +691,17 @@ licode_t LiFindFirst( liFindData_t *dat, liObj_t *o, const char *s ) {
     liassert( s );
     
     /* init liFindData_t structure */
-    dat->startObj = o;
-    dat->global = lifalse;
-    dat->parsedPattern = NULL;
+    dat->obj = NULL;
+    dat->pattern = NULL;
     dat->index = 0;
     
     if( !LiIsCorrectRefStr(s) ) {
         return LI_EINPDAT;
     }
     
-    /* check for global pattern */
+    /* check for global pattern (start from the root) */
     if( *s == '.' ) {
         s++;
-        dat->global = litrue;
-        
         /* go to root */
         while( o->parent ) {
             o = o->parent;
@@ -1390,81 +709,41 @@ licode_t LiFindFirst( liFindData_t *dat, liObj_t *o, const char *s ) {
         while( o->prev ) {
             o = o->prev;
         }
-        dat->startObj = o;
     }
     
-    /* parse pattern */
+    /* parse the search pattern */
     if( *s ) {
-        /* init parsedPattern array */
-        dat->parsedPattern = LiArrayAlloc(
-                sizeof(struct parsedPatternData_s), 16 );
-        struct parsedPatternData_s patternData;
+        /* init pattern array */
+        dat->pattern = LiArrayAlloc( sizeof(struct patternData_s), 16 );
+        dat->obj = o;
+        
+        struct patternData_s patternData;
         const char *startSubstr;
         while( is_firstkeych(*s) ) {
             patternData.str = startSubstr = s;
             s++;
             for( ; is_nextkeych(*s); s++ );
-            patternData.len = (uint32_t)(s - startSubstr);
-            dat->parsedPattern = LiArrayAppend( dat->parsedPattern,
+            patternData.len = (lisize_t)(s - startSubstr);
+            patternData.checked = lifalse;
+            dat->pattern = LiArrayAppend( dat->pattern,
                     &patternData );
             if( *s == '.' && s[1] != 0 ) {
                 s++;
             }
         }
         if( *s != 0 ) {
+            /* the string is invalid */
             return LI_EINPDAT;
         }
     } else {
+        /* the string is empty */
         return LI_EINPDAT;
     }
     
-    
-    /* find first object */
-    /*struct parsedPatternData_s *pattern;
-    uint32_t maxIndex = dat->parsedPattern->num - 1;
-    while( o ) {
-        pattern = ((struct parsedPatternData_s*)
-                dat->parsedPattern->array) + dat->index;
-        liStr_t *key = o->key;
-        if( key && (key->len == pattern->len) &&
-                (0 == strncmp( key->str, pattern->str, key->len ) ) ) {
-            if( dat->index == maxIndex ) {
-            
-                dat->obj = o;
-                dat->startObj = o;
-                return LI_OK;
-            } else if( o->firstChild && (dat->index < maxIndex) ) {
-                o = o->firstChild;
-                dat->index++;
-                continue;
-            }
-        }
-        if( o->next ) {
-            o = o->next;
-        } else if( o->parent && (dat->index > 0) ) {
-            o = o->parent;
-            while( o->parent && !(o->parent->next) && (dat->index > 0) ) {
-                dat->index--;
-                o = o->parent;
-            }
-            if( o->next ) {
-                o = o->next;
-            } else {
-                break;
-            }
-        } else {
-            break;
-        }
-    }
-    
-    dat->startObj = NULL;
-    return LI_FINISHED;*/
-    
-    struct parsedPatternData_s *pattern = 
-            (struct parsedPatternData_s*)dat->parsedPattern->array;
-    if( (dat->parsedPattern->num == 1) && o->key &&
-            (o->key->len == pattern->len) &&
-            (0 == strncmp( o->key->str, pattern->str, o->key->len )) ) {
+    /* check if the first element is found */
+    struct patternData_s *pattern = (struct patternData_s*)aarr(dat->pattern);
+    if( (anum(dat->pattern) == 1) && o->key && (0 == LiSCmpL( o->key, 
+            pattern->str, slen(o->key) )) ) {
         dat->obj = o;
         return LI_OK;
     }
@@ -1472,19 +751,93 @@ licode_t LiFindFirst( liFindData_t *dat, liObj_t *o, const char *s ) {
     return LiFindNext( dat );
 }
 
+liObj_t *SkipToNext( liFindData_t *dat, liObj_t *o, int toDown ) {
+    if( toDown && (dat->index < (anum(dat->pattern) - 1)) && o->firstChild ) {
+        /* skip down */
+        dat->index++;
+        o = o->firstChild;
+    } else if( o->next ) {
+        /* skip to next sibling */
+        o = o->next;
+    } else if( (dat->index > 0) && o->parent ) {
+        /* skip up */
+        do {
+            dat->index--;
+            o = o->parent;
+        } while( (dat->index > 0) && (!o->next) && (o->parent) );
+        o = o->next;
+    } else {
+        /* no unvisited nodes left */
+        return NULL;
+    }
+    
+    return o;
+}
+
+/*
+============
+LiFindNext
+============
+*/
 licode_t LiFindNext( liFindData_t *dat ) {
     liassert( dat );
+    liassert( dat->pattern );
     
-    if( !dat->startObj ) {
+    liObj_t *o = dat->obj;
+    if( !o ) {
         return LI_FINISHED;
     }
     
+    /* skip to next */
+    o = SkipToNext( dat, o, 1 );
+    
+    /* fix for unnamed objects */
+    if( dat->index == (anum(dat->pattern) - 1) && o && !o->key ) {
+        dat->obj = o;
+        return LI_OK;
+    }
+    
+    /* find next */
+    struct patternData_s *pattern;
+    while( o ) {
+        pattern = ((struct patternData_s*)aarr(dat->pattern)) + dat->index;
+        
+       // Log( "%s\n", (o->key ? sstr(o->key) : "(no key)" ) );
+        
+        if( o->key && (0 == LiSCmpL(o->key, pattern->str, slen(o->key))) ){
+            if( dat->index == (anum(dat->pattern) - 1) ) {
+                /* object found */
+                dat->obj = o;
+                return LI_OK;
+            }
+            o = SkipToNext( dat, o, 1 );
+            continue;
+        } else if( !o->key ) {
+            o = SkipToNext( dat, o, 1 );
+        } else {
+            o = SkipToNext( dat, o, 0 );
+        }
+    }
+    
+    dat->obj = NULL;
     return LI_FINISHED;
-    return LI_OK;
 }
 
+/*
+============
+LiFindClose
+============
+*/
 licode_t LiFindClose( liFindData_t *dat ) {
     liassert( dat );
+    
+    if( dat->pattern ) {
+        LiArrayFree( dat->pattern );
+        dat->pattern = NULL;
+    }
+    dat->obj = NULL;
+    dat->index = 0;
+    
     return LI_FINISHED;
 }
 
@@ -1517,7 +870,7 @@ LiWriteStr
 ============
 */
 static licode_t LiWriteStr( liFile_t f, fnLiWrite wr,
-        const char *s, uint32_t len ) {
+        const char *s, lisize_t len ) {
     liassert( s );
     ssize_t ret = wr( s, len, f );
     if( ret < 0 ) {
@@ -1533,7 +886,7 @@ LiWriteCstr
 */
 static licode_t LiWriteCstr( liFile_t f, fnLiWrite wr, const char *s ) {
     liassert( s );
-    return LiWriteStr( f, wr, s, (uint32_t)strlen(s) );
+    return LiWriteStr( f, wr, s, (lisize_t)StrLen(s) );
 }
 
 /*
@@ -1543,7 +896,7 @@ LiWriteLiStr
 */
 static licode_t LiWriteLiStr( liFile_t f, fnLiWrite wr, liStr_t *s ) {
     liassert( s );
-    return LiWriteStr( f, wr, s->str, s->len );
+    return LiWriteStr( f, wr, sstr(s), slen(s) );
 }
 
 /*
@@ -1720,6 +1073,7 @@ licode_t LiWrite( liIO_t *io, liObj_t *o, const char *name, liflag_t flags ) {
     licode_t code = LI_OK;
     
     if( io == NULL ) {
+        extern liIO_t liDefaultIO;
         io = &liDefaultIO;
     }
     
