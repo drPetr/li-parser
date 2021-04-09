@@ -57,6 +57,16 @@ typedef struct {
 
 
 
+liObj_t     *LiParent( liObj_t *o );
+liObj_t     *LiNext( liObj_t *o );
+liObj_t     *LiPrev( liObj_t *o );
+liObj_t     *LiFirstChild( liObj_t *o );
+liObj_t     *LiLastChild( liObj_t *o );
+liObj_t     *LiFirst( liObj_t *o );
+liObj_t     *LiLast( liObj_t *o );
+liObj_t     *LiRoot( liObj_t *o );
+
+
 void        LiInsertFirstChild( liObj_t *node, liObj_t *insert );
 void        LiInsertLastChild( liObj_t *node, liObj_t *insert );
 void        LiInsertBefore( liObj_t *node, liObj_t *insert );
@@ -66,7 +76,6 @@ void        LiInsertLast( liObj_t *node, liObj_t *insert );
 liObj_t     *LiExtract( liObj_t *node );
 liObj_t     *LiExtractSiblings( liObj_t *left, liObj_t *right );
 liObj_t     *LiExtractChildren( liObj_t *node );
-liObj_t     *LiNodeCreate( void );
 void        LiFreeSubtree( liObj_t *node );
 void        LiFree( liObj_t *li );
 

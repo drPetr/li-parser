@@ -6,30 +6,150 @@
 
 /*
 ================================================
+              li object navigation
+================================================
+*/
+
+/*
+============
+LiParent
+============
+*/
+liObj_t *LiParent( liObj_t *o ) {
+    liassert(o);
+    return o->parent;
+}
+
+/*
+============
+LiNext
+============
+*/
+liObj_t *LiNext( liObj_t *o ) {
+    liassert(o);
+    return o->next;
+}
+
+/*
+============
+LiPrev
+============
+*/
+liObj_t *LiPrev( liObj_t *o ) {
+    liassert(o);
+    return o->prev;
+}
+
+/*
+============
+LiFirstChild
+============
+*/
+liObj_t *LiFirstChild( liObj_t *o ) {
+    liassert(o);
+    return o->firstChild;
+}
+
+/*
+============
+LiLastChild
+============
+*/
+liObj_t *LiLastChild( liObj_t *o ) {
+    liassert(o);
+    return o->lastChild;
+}
+
+/*
+============
+LiFirst
+============
+*/
+liObj_t *LiFirst( liObj_t *o ) {
+    liassert(o);
+    if( o->parent ) {
+        liassert(o->parent->firstChild);
+        return o->parent->firstChild;
+    }
+    while( o->prev ) {
+        o = o->prev;
+    }
+    return o;
+}
+
+/*
+============
+LiLast
+============
+*/
+liObj_t *LiLast( liObj_t *o ) {
+    liassert(o);
+    if( o->parent ) {
+        liassert(o->parent->lastChild);
+        return o->parent->lastChild;
+    }
+    while( o->next ) {
+        o = o->next;
+    }
+    return o;
+}
+
+/*
+============
+LiRoot
+============
+*/
+liObj_t *LiRoot( liObj_t *o ) {
+    liassert(o);
+    while( o->parent ) {
+        o = o->parent;
+    }
+    while( o->prev ) {
+        o = o->prev;
+    }
+    return o;
+}
+
+
+
+/*
+================================================
         li object insert/extract functions
 ================================================
 */
 
 /*
 ============
-LiInsertionHelper
+InsertionHelper
+
+left - insert it node before firstInsert
+right - insert it node after lastInsert
+parent - insert it node as parent of the insert sequence
+firstInsert - first node in the insert sequence
+lastInsert - last node in the insert sequence
 ============
 */
-static void LiInsertionHelper( liObj_t *left, liObj_t *right, 
-        liObj_t *parent, liObj_t *insert ) {
-    /* first node in the insert sequence */
-    liObj_t *firstInsert = insert;
-    /* last node in the insert sequence */
-    liObj_t *lastInsert = insert;
-    
-    liassert( left || right || parent );
-    liassert( insert );
-
+static void InsertionHelper( liObj_t *left, liObj_t *right, 
+        liObj_t *parent, liObj_t *firstInsert, liObj_t *lastInsert ) {    
 #if !defined(LI_NODBG) && defined(DEBUG)
-    liassert( insert != parent );
-    liassert( insert != left );
-    liassert( insert != right );
-    liassert( insert->parent == NULL );
+    liassert( left || right || parent );
+    liassert( firstInsert && lastInsert );
+    liassert( firstInsert->prev == NULL );
+    liassert( lastInsert->next == NULL );
+    liassert( firstInsert != parent );
+    liassert( firstInsert != left );
+    liassert( firstInsert != right );
+    liassert( lastInsert != parent );
+    liassert( lastInsert != left );
+    liassert( lastInsert != right );
+    
+    if( 1 ) {
+        liObj_t *it = firstInsert;
+        do {
+            liassert( it->parent == NULL );
+        } while( (it = it->next) );
+    }
+    
     if( left && right ) {
         liassert( left->parent == right->parent );
         liassert( left->next == right );
@@ -73,23 +193,16 @@ static void LiInsertionHelper( liObj_t *left, liObj_t *right,
             liasserta( chk, "error: right." );
         }
     }
-#endif
-
-    /* set the whole sibling sequence of the parent and get a
-    pointer to the last node of the sibling sequence */
-    insert->parent = parent;
-    while( lastInsert->next ) {
-        lastInsert = lastInsert->next;
-        lastInsert->parent = parent;
-    }
-    
-    while( firstInsert->prev ) {
-        firstInsert = firstInsert->prev;
-        firstInsert->parent = parent;
-    }
-
+#endif    
     /* restoring "family" relations */
     if( parent ) {
+        /* set the whole sibling sequence of the parent and get a
+        pointer to the last node of the sibling sequence */
+        liObj_t *it = firstInsert;
+        do {
+            it->parent = parent;
+        } while( (it = it->next) );
+        
         if( left ) {
 			left->next = firstInsert;
 			firstInsert->prev = left;
@@ -116,25 +229,46 @@ static void LiInsertionHelper( liObj_t *left, liObj_t *right,
 
 /*
 ============
+RestoreKeys
+============
+*/
+static void RestoreKeys( liObj_t *left, liObj_t *parent, liObj_t *restore ){
+    liassert( left || parent );
+    liassert( restore );
+    liassert( restore->prev == NULL );
+        
+    if( left ) {
+        liassert( left->key );
+        while( restore && !restore->key ) {
+            restore->key = LiSRef( left->key );
+            restore = restore->next;
+        }
+    } else if( parent ) {
+        /* TODO */
+        /* restore keys by parent */
+    }
+}
+
+/*
+============
 LiInsertFirstChild
 
 Insert an insert node as the first child of a node
 ============
 */
-void LiInsertFirstChild( liObj_t *node, liObj_t *insert ) {
-    liassert( node );
+void LiInsertFirstChild( liObj_t *obj, liObj_t *insert ) {
+    liassert( obj );
     liassert( insert );
-    liassert( node->type == LI_VTOBJ );
-    liassert( insert->type != LI_VTUNDEF );
-#if !defined(LI_NODBG) && defined(DEBUG)
-    liObj_t *o = insert;
-    while( o->prev ) {
-        o = o->prev;
-    }
-    liassert( o->key != NULL );
-#endif
-    LiInsertionHelper( NULL, node->firstChild, node, insert );
+    liassert( obj->type == LI_VTOBJ );
+    liassert( LiFirst( insert )->key != NULL );
+
+    liObj_t *firstInsert = LiFirst( insert );
+    liObj_t *lastInsert = LiLast( insert );
+    RestoreKeys( NULL, obj, firstInsert );
+    InsertionHelper( NULL, obj->firstChild, obj, firstInsert, lastInsert );
 }
+
+
 
 /*
 ============
@@ -143,21 +277,22 @@ LiInsertLastChild
 Insert the insert node as the last child of the node
 ============
 */
-void LiInsertLastChild( liObj_t *node, liObj_t *insert ) {
-    liassert( node );
+void LiInsertLastChild( liObj_t *obj, liObj_t *insert ) {
+    liassert( obj );
     liassert( insert );
-    liassert( node->type == LI_VTOBJ );
-    liassert( insert->type != LI_VTUNDEF );
+    liassert( obj->type == LI_VTOBJ );
 #if !defined(LI_NODBG) && defined(DEBUG)
-    liObj_t *o = insert;
-    while( o->prev ) {
-        o = o->prev;
-    }
-    if( node->lastChild == NULL ) {
-        liassert( o->key != NULL );
+    if( obj->lastChild == NULL ) {
+        liassert( LiFirst( insert )->key != NULL );
     }
 #endif
-    LiInsertionHelper( node->lastChild, NULL, node, insert );
+
+    liObj_t *firstInsert = LiFirst( insert );
+    liObj_t *lastInsert = LiLast( insert );
+    if( !firstInsert->key ) {
+        RestoreKeys( obj->lastChild, obj, firstInsert );
+    }
+    InsertionHelper( obj->lastChild, NULL, obj, firstInsert, lastInsert );
 }
 
 /*
@@ -167,12 +302,16 @@ LiInsertBefore
 Insert an insert node before the node
 ============
 */
-void LiInsertBefore( liObj_t *node, liObj_t *insert ) {
-    liassert( node );
+void LiInsertBefore( liObj_t *obj, liObj_t *insert ) {
+    liassert( obj );
     liassert( insert );
-    liassert( node->type != LI_VTUNDEF );
-    liassert( insert->type != LI_VTUNDEF );
-    LiInsertionHelper( node->prev, node, node->parent, insert );
+    
+    liObj_t *firstInsert = LiFirst( insert );
+    liObj_t *lastInsert = LiLast( insert );
+    if( !firstInsert->key ) {
+        RestoreKeys( obj->prev, obj->parent, firstInsert );
+    }
+    InsertionHelper( obj->prev, obj, obj->parent, firstInsert, lastInsert );
 }
 
 /*
@@ -182,12 +321,16 @@ LiInsertAfter
 Insert an insert node after a node
 ============
 */
-void LiInsertAfter( liObj_t *node, liObj_t *insert ) {
-    liassert( node );
+void LiInsertAfter( liObj_t *obj, liObj_t *insert ) {
+    liassert( obj );
     liassert( insert );
-    liassert( node->type != LI_VTUNDEF );
-    liassert( insert->type != LI_VTUNDEF );
-    LiInsertionHelper( node, node->next, node->parent, insert );
+    
+    liObj_t *firstInsert = LiFirst( insert );
+    liObj_t *lastInsert = LiLast( insert );
+    if( !firstInsert->key ) {
+        RestoreKeys( obj, obj->parent, firstInsert );
+    }
+    InsertionHelper( obj, obj->next, obj->parent, firstInsert, lastInsert );
 }
 
 /*
@@ -197,20 +340,17 @@ LiInsertFirst
 Insert the insert node first in the sequence node
 ============
 */
-void LiInsertFirst( liObj_t *node, liObj_t *insert ) {
-    liassert( node );
+void LiInsertFirst( liObj_t *obj, liObj_t *insert ) {
+    liassert( obj );
     liassert( insert );
-    liassert( node->type != LI_VTUNDEF );
-    liassert( insert->type != LI_VTUNDEF );
     
-    if( node->parent ) {
-        node = node->parent->firstChild;
-    } else {
-        while( node->prev ) {
-            node = node->prev;
-        }
+    obj = LiFirst( obj );
+    liObj_t *firstInsert = LiFirst( insert );
+    liObj_t *lastInsert = LiLast( insert );
+    if( !firstInsert->key ) {
+        RestoreKeys( NULL, obj->parent, firstInsert );
     }
-    LiInsertionHelper( NULL, node, node->parent, insert );
+    InsertionHelper( NULL, obj, obj->parent, firstInsert, lastInsert );
 }
 
 /*
@@ -220,72 +360,38 @@ LiInsertLast
 Insert the insert node as the last node in the sequence
 ============
 */
-void LiInsertLast( liObj_t *node, liObj_t *insert ) {
-    liassert( node );
+void LiInsertLast( liObj_t *obj, liObj_t *insert ) {
+    liassert( obj );
     liassert( insert );
-    liassert( node->type != LI_VTUNDEF );
-    liassert( insert->type != LI_VTUNDEF );
     
-    if( node->parent ) {
-        node = node->parent->lastChild;
-    } else {
-        while( node->next ) {
-            node = node->next;
-        }
+    obj = LiLast( obj );
+    liObj_t *firstInsert = LiFirst( insert );
+    liObj_t *lastInsert = LiLast( insert );
+    if( !firstInsert->key ) {
+        RestoreKeys( obj, obj->parent, firstInsert );
     }
-    LiInsertionHelper( node, NULL, node->parent, insert );
+    InsertionHelper( obj, NULL, obj->parent, firstInsert, lastInsert );
 }
 
 /*
 ============
-LiExtractionHelper
+ExtractionHelper
 ============
 */
-static liObj_t *LiExtractionHelper( liObj_t *left, liObj_t *right ) {
-    liObj_t *ext = NULL;
-    liObj_t *it;
-    liObj_t *parent;
-    liObj_t *before;
-    liObj_t *after;
-    
-    /* should  be at least one node */
+static liObj_t *ExtractionHelper( liObj_t *left, liObj_t *right ) {
     liassert( left || right );
     
-    /* if left node is set and right node is set */
-    if( left && right ) {
-        ext = left;
-#if !defined(LI_NODBG) && defined(DEBUG)
-        /* check left and right sequence */
-        if( ext != right ) {
-            while( ext && ext != right ) {
-                ext = ext->next;
-            }
-        }
-        liassert( ext == right );
-        ext = left;
-#endif
-    } else if( left || right ) {
-        /* if only one node is set */
-        /* if only one left node */
-        if( left ) {
-            ext = left;
-            right = left;
-            while( right->next ) {
-                right = right->next;
-            }
-        } else { 
-            /* else right node */
-            left = right;
-            while( left->prev ) {
-                left = left->prev;
-            }
-            ext = left;
-        }
+    /* restore pointers to both left and right nodes */
+    if( !right ) {
+        right = LiLast( left );
+    } else if( !left ) {
+        left = LiFirst( right );
     }
     
-    parent = left->parent;
-    before = left->prev;
-    after = right->next;
+    liObj_t *parent = left->parent;
+    liObj_t *before = left->prev;
+    liObj_t *after = right->next;
+    liObj_t *it;
     
     /* if the left node has a previous sibling and the
     right node has a next sibling */
@@ -309,17 +415,16 @@ static liObj_t *LiExtractionHelper( liObj_t *left, liObj_t *right ) {
     
     /* disconnect parents */
     if( parent ) {
-        if( left == parent->firstChild && right == parent->lastChild ) {
-            /* no descendants */
-            parent->firstChild = NULL;
-            parent->lastChild = NULL;
-        } else if( left == parent->firstChild || right == parent->lastChild ){
-            /* set new pointers to descendants */
-            if( left == parent->firstChild ) {
-                parent->firstChild = after;
+        if( left == parent->firstChild ) {
+            if( right == parent->lastChild ) {
+                /* no descendants */
+                parent->firstChild = NULL;
+                parent->lastChild = NULL;
             } else {
-                parent->lastChild = before;
+                parent->firstChild = after;
             }
+        } else if( right == parent->lastChild ) {
+            parent->lastChild = before;
         }
         
         it = left;
@@ -329,7 +434,7 @@ static liObj_t *LiExtractionHelper( liObj_t *left, liObj_t *right ) {
         } while( it != right );
     }
     
-    return ext;
+    return left;
 }
 
 /*
@@ -337,9 +442,9 @@ static liObj_t *LiExtractionHelper( liObj_t *left, liObj_t *right ) {
 LiExtract
 ============
 */
-liObj_t *LiExtract( liObj_t *node ) {
-    liassert( node );
-    return LiExtractionHelper( node, node );
+liObj_t *LiExtract( liObj_t *obj ) {
+    liassert( obj );
+    return ExtractionHelper( obj, obj );
 }
 
 /*
@@ -349,7 +454,17 @@ LiExtractSiblings
 */
 liObj_t *LiExtractSiblings( liObj_t *left, liObj_t *right ) {
     liassert( left || right );
-    return LiExtractionHelper( left, right );
+#if !defined(LI_NODBG) && defined(DEBUG)
+    if( left && right ) {
+        liObj_t *it;
+        while( it && it != right ) {
+            it = it->next;
+        }
+        liasserta( it == right, "error: left and right are not siblings "
+                " or left node is to the right of the right node" );
+    }
+#endif
+    return ExtractionHelper( left, right );
 }
 
 /*
@@ -357,36 +472,13 @@ liObj_t *LiExtractSiblings( liObj_t *left, liObj_t *right ) {
 LiExtractChildren
 ============
 */
-liObj_t *LiExtractChildren( liObj_t *node ) {
-    liassert( node );
-    if( node->firstChild ) {
-        return LiExtractionHelper( node->firstChild, node->lastChild );
-    }
-    return NULL;
+liObj_t *LiExtractChildren( liObj_t *obj ) {
+    liassert( obj );
+    liassert( obj->firstChild );
+    return ExtractionHelper( obj->firstChild, obj->lastChild );
 }
 
-/*
-============
-LiNodeCreate
-============
-*/
-liObj_t *LiNodeCreate( void ) {
-    liObj_t *node;
-    
-    node = (liObj_t*)LiAlloc( sizeof(liObj_t), LI_TYID_NODE );
-    
-    node->parent = NULL;
-    node->next = NULL;
-    node->prev = NULL;
-    node->firstChild = NULL;
-    node->lastChild = NULL;
-    node->ptr = NULL;
-    node->key = NULL;
-    node->type = LI_VTUNDEF;
-    node->flags = 0;
-    
-    return node;
-}
+
 
 /*
 ============
@@ -417,8 +509,6 @@ static void LiNodeFreeSubtreeHelper_r( liObj_t *node, int level ) {
         
         /* free object value */
         switch( node->type ) {
-            case LI_VTUNDEF:
-                break;
             case LI_VTNULL:
                 break;
             case LI_VTOBJ:
@@ -595,11 +685,35 @@ libool_t LiIsObj( liObj_t *o ) {
 
 /*
 ============
+NodeCreate
+============
+*/
+static liObj_t *NodeCreate( void ) {
+    liObj_t *node;
+    
+    node = (liObj_t*)LiAlloc( sizeof(liObj_t), LI_TYID_NODE );
+    
+    node->parent = NULL;
+    node->next = NULL;
+    node->prev = NULL;
+    node->firstChild = NULL;
+    node->lastChild = NULL;
+    node->ptr = NULL;
+    node->key = NULL;
+    node->type = 0;
+    node->flags = 0;
+    
+    return node;
+}
+
+
+/*
+============
 LiObj
 ============
 */
 liObj_t *LiObj( void ) {
-    liObj_t *o = LiNodeCreate();
+    liObj_t *o = NodeCreate();
     o->type = LI_VTOBJ;
     return o;
 }
@@ -610,7 +724,7 @@ LiNull
 ============
 */
 liObj_t *LiNull( void ) {
-    liObj_t *o = LiNodeCreate();
+    liObj_t *o = NodeCreate();
     o->type = LI_VTNULL;
     return o;
 }
@@ -630,7 +744,7 @@ LiStrL
 ============
 */
 liObj_t *LiStrL( const char *s, lisize_t len ) {
-    liObj_t *o = LiNodeCreate();
+    liObj_t *o = NodeCreate();
     o->type = LI_VTSTR;
     o->vstr = s ? LiSNewL( s, len ) : NULL;
     return o;
@@ -642,7 +756,7 @@ LiInt
 ============
 */
 liObj_t *LiInt( int64_t i ) {
-    liObj_t *o = LiNodeCreate();
+    liObj_t *o = NodeCreate();
     o->type = LI_VTINT;
     o->vint = i;
     return o;
@@ -654,7 +768,7 @@ LiUint
 ============
 */
 liObj_t *LiUint( uint64_t u ) {
-    liObj_t *o = LiNodeCreate();
+    liObj_t *o = NodeCreate();
     o->type = LI_VTUINT;
     o->vuint = u;
     return o;
@@ -666,7 +780,7 @@ LiBool
 ============
 */
 liObj_t *LiBool( libool_t b ) {
-    liObj_t *o = LiNodeCreate();
+    liObj_t *o = NodeCreate();
     o->type = LI_VTBOOL;
     o->vint = b;
     return o;
@@ -790,12 +904,6 @@ licode_t LiFindNext( liFindData_t *dat ) {
     
     /* skip to next */
     o = SkipToNext( dat, o, 1 );
-    
-    /* fix for unnamed objects */
-    if( dat->index == (anum(dat->pattern) - 1) && o && !o->key ) {
-        dat->obj = o;
-        return LI_OK;
-    }
     
     /* find next */
     struct patternData_s *pattern;
@@ -986,13 +1094,13 @@ static licode_t LiWriteHelper_r( liFile_t f, fnLiWrite wr,
         nl = 1;
         
         /* write key */
-        if( o->key ) {
+        if( !o->prev || (o->prev->key != o->key) ) {
             LiWriteLiStr( f, wr, o->key );
             LiWriteCstr( f, wr, " = " );
         } else {
             LiWriteCstr( f, wr, ", " );
         }
-        if( o->next && (o->next->key == NULL) ) {
+        if( o->next && (o->next->key == o->key) ) {
             nl = 0;
         }
         
