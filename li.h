@@ -99,8 +99,13 @@ licode_t    LiFindNext( liFindData_t *dat );
 licode_t    LiFindClose( liFindData_t *dat );
 
 
-licode_t    LiWrite( liIO_t *io, liObj_t *o, const char *name, liflag_t flags );
+licode_t    LiWrite( liObj_t *o, const char *name );
+licode_t    LiWriteEx( liIO_t *io, liObj_t *o, const char *name, 
+                    liflag_t flags );
 
+licode_t    LiRead( liObj_t **o, const char *name );
+licode_t    LiReadEx( liIO_t *io, liObj_t **o, const char *name, 
+                    liflag_t flags, char *errbuf, size_t errbufLen );
 
 
 #endif //__LI_H__

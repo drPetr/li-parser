@@ -546,9 +546,7 @@ LiFreeSubtree
 */
 void LiFreeSubtree( liObj_t *node ) {
     liassert( node );
-    node = LiExtract( node );
-    liassert( node );
-    LiNodeFreeSubtreeHelper_r( node, 0 );
+    LiNodeFreeSubtreeHelper_r( LiExtract(node), 0 );
 }
 
 /*
@@ -558,11 +556,7 @@ LiFree
 */
 void LiFree( liObj_t *li ) {
     liassert( li );
-    
-    while( li->parent ) {
-        li = li->parent;
-    }
-    LiNodeFreeSubtreeHelper_r( li, 0 );
+    LiNodeFreeSubtreeHelper_r( LiRoot(li), 0 );
 }
 
 
@@ -856,8 +850,8 @@ licode_t LiFindFirst( liFindData_t *dat, liObj_t *o, const char *s ) {
     
     /* check if the first element is found */
     struct patternData_s *pattern = (struct patternData_s*)aarr(dat->pattern);
-    if( (anum(dat->pattern) == 1) && o->key && (0 == LiSCmpL( o->key, 
-            pattern->str, slen(o->key) )) ) {
+    if( (anum(dat->pattern) == 1) && o->key && LiSCmpL( o->key, pattern->str,
+            slen(o->key) ) ) {
         dat->obj = o;
         return LI_OK;
     }
@@ -865,7 +859,7 @@ licode_t LiFindFirst( liFindData_t *dat, liObj_t *o, const char *s ) {
     return LiFindNext( dat );
 }
 
-liObj_t *SkipToNext( liFindData_t *dat, liObj_t *o, int toDown ) {
+static liObj_t *SkipToNext( liFindData_t *dat, liObj_t *o, int toDown ) {
     if( toDown && (dat->index < (anum(dat->pattern) - 1)) && o->firstChild ) {
         /* skip down */
         dat->index++;
@@ -912,7 +906,7 @@ licode_t LiFindNext( liFindData_t *dat ) {
         
        // Log( "%s\n", (o->key ? sstr(o->key) : "(no key)" ) );
         
-        if( o->key && (0 == LiSCmpL(o->key, pattern->str, slen(o->key))) ){
+        if( o->key && LiSCmpL(o->key, pattern->str, slen(o->key)) ){
             if( dat->index == (anum(dat->pattern) - 1) ) {
                 /* object found */
                 dat->obj = o;
@@ -948,6 +942,7 @@ licode_t LiFindClose( liFindData_t *dat ) {
     
     return LI_FINISHED;
 }
+
 
 
 /*
@@ -1072,10 +1067,10 @@ static licode_t LiWriteUint( liFile_t f, fnLiWrite wr, liObj_t *o ) {
 
 /*
 ============
-LiWriteHelper_r
+WriteHelper_r
 ============
 */
-static licode_t LiWriteHelper_r( liFile_t f, fnLiWrite wr, 
+static licode_t WriteHelper_r( liFile_t f, fnLiWrite wr, 
         liObj_t *o, liflag_t flags, int level ) {
     licode_t code = LI_OK;
     int nl = 1;
@@ -1114,7 +1109,7 @@ static licode_t LiWriteHelper_r( liFile_t f, fnLiWrite wr,
                 if( o->firstChild ) {
                     /* begin of object */
                     LiWriteCstr( f, wr, "{\n" );
-                    code = LiWriteHelper_r( f, wr, o->firstChild, 
+                    code = WriteHelper_r( f, wr, o->firstChild, 
                             flags, level + 1 );
                     if( code != LI_OK ) {
                         return code;
@@ -1174,8 +1169,19 @@ static licode_t LiWriteHelper_r( liFile_t f, fnLiWrite wr,
 LiWrite
 ============
 */
-licode_t LiWrite( liIO_t *io, liObj_t *o, const char *name, liflag_t flags ) {
-    liassert( o );
+licode_t LiWrite( liObj_t *o, const char *name ) {
+    liassert(o);
+    return LiWriteEx( NULL, o, name, 0 );
+}
+
+/*
+============
+LiWriteEx
+============
+*/
+licode_t LiWriteEx( liIO_t *io, liObj_t *o, const char *name,
+        liflag_t flags ) {
+    liassert(o);
     
     liFile_t f;
     licode_t code = LI_OK;
@@ -1186,10 +1192,278 @@ licode_t LiWrite( liIO_t *io, liObj_t *o, const char *name, liflag_t flags ) {
     }
     
     f = io->open( name, 'w' );
+    if( f == NULL ) {
+        return LI_EFILEOPEN;
+    }
     if( o ) {
-        code = LiWriteHelper_r( f, io->write, o, flags, 0 );
+        code = WriteHelper_r( f, io->write, o, flags, 0 );
     }
     io->close( f );
     
     return code;
 }
+
+
+
+/*
+================================================
+                    li parser
+================================================
+*/
+
+typedef struct {
+    char*       begin;      /* beginptr */
+    char*       forward;    /* endptr */
+    size_t      length;     /* available length */
+    int         token;
+    int         line;
+    int         column;
+    
+    char        *beginptr;  /* begin of buffer */
+    char        *endptr;    /* end of buffer */
+    
+    liFile_t    file;
+    fnLiRead    read;
+    liStr_t     *scanBuf;
+    liStr_t     *errPrint;
+    char        *errBuf;
+    size_t      errBufLen;
+} scaner_t;
+
+#define l       (s->length)
+#define tk      (s->token)
+#define ln      (s->line)
+#define cl      (s->column)
+
+/*
+============
+InitScaner
+============
+*/
+static libool_t InitScaner( scaner_t *s, liFile_t f, fnLiRead rd, 
+        char *errBuf, size_t errBufLen ) {
+    s->length = 0;
+    s->token = 0;
+    s->line = 0;
+    s->column = 0;
+    s->file = f;
+    s->read = rd;
+    s->scanBuf = LiSAlloc( 1024 * 1024 );
+    s->errPrint = NULL;
+    s->errBuf = errBuf;
+    s->errBufLen = errBufLen;
+    s->beginptr = sstr(s->scanBuf);
+    s->endptr = sstr(s->scanBuf);
+    return litrue;
+}
+
+/*
+============
+FinalScaner
+============
+*/
+static void FinalScaner( scaner_t *s ) {
+    /* copy error message to the error buffer */
+    if( s->errBuf ) {
+        if( s->errPrint ) {
+            lisize_t min = slen(s->errPrint) < s->errBufLen - 1 ?
+                    slen(s->errPrint) : s->errBufLen - 1;
+            MemCpy( s->errBuf, sstr(s->errPrint), min );
+            s->errBuf[min] = 0;
+        }
+    }
+    
+    /* free buffers */
+    if( s->scanBuf ) {
+        LiSFree( s->scanBuf );
+    }
+    if( s->errPrint ) {
+        LiSFree( s->errPrint );
+    }
+}
+
+/*
+============
+BufferUpdate
+============
+*/
+static ssize_t BufferUpdate( scaner_t *s ) {
+    ssize_t ret1 = 0, ret2 = 0;
+    fnLiRead read = s->read;
+    char *beg = s->beginptr;
+    char *end = s->endptr;
+    char *buf = sstr(s->scanBuf);
+    char *eob = buf + salc(s->scanBuf) - 1;
+    liFile_t fp = s->file;
+    
+    if( beg <= end ) {
+        size_t siz1 = (size_t)(eob - end);
+        size_t siz2 = (size_t)(beg - buf);
+        
+        /* read first part */
+        if( siz1 ) {
+            ret1 = read( end, siz1, fp );
+            if( ret1 < 0 ) {
+                return ret1;
+            }
+            end += ret1;
+        }
+        
+        /* read second part */
+        if( siz2 && (eob == end) ) {
+            ret2 = read( buf, siz2, fp );
+            if( ret2 < 0 ) {
+                return ret2;
+            } else if( ret2 > 0 ) {
+                end = buf + ret2 - 1;
+            }
+        }
+    } else { /* beg > end */
+        size_t siz = (size_t)(beg - end - 1);
+        if( siz ) {
+            ret1 = read( end, siz, fp );
+            if( ret1 < 0 ) {
+                return ret1;
+            }
+            end += ret1;
+        }
+    }
+    
+    /* save values to the scaner */
+    s->endptr = end;
+    
+    liassert( beg < eob );
+    liassert( end < eob );
+    liassert( beg >= buf );
+    liassert( end >= buf );
+    
+    return ret1 + ret2;
+}
+
+static size_t ReadFromBuffer( char *dst, scaner_t *s, size_t size ) {
+    size_t siz1 = 0, siz2 = 0, min;
+    char *beg = s->beginptr;
+    char *end = s->endptr;
+    char *buf = sstr(s->scanBuf);
+    char *eob = buf + salc(s->scanBuf) - 1;
+    
+    if( beg <= end ) {
+        siz1 = (size_t)(end - beg);
+        min = siz1 < size ? siz1 : size;
+        MemCpy( dst, beg, min );
+        s->beginptr += min;
+    } else { /* beg > end */
+        siz1 = (size_t)(eob - beg + 1);
+        siz2 = (size_t)(beg - end);
+        min = siz1 < size ? siz1 : size;
+        if( min ) {
+            MemCpy( dst, beg, min );
+            size -= min;
+            dst += min;
+            s->beginptr += min;
+        }
+        min = siz2 < size ? siz2 : size;
+        if( min ) {
+            MemCpy( dst, buf, min );
+            size -= min;
+            s->beginptr = buf + min;
+        }
+    }
+    
+    return siz1 + siz2;
+}
+
+/*static char GetBufferChar( scaner_t *s ) {
+    
+}
+
+*/
+/*
+static liStr_t *UpdateScanBuffer( liFile_t f, fnLiRead rd, liStr_t *buf ) {
+    
+}
+
+static void ParseStateInit( liFile_t f, fnLiRead rd ) {
+    
+}
+
+static void ParseStateFinal() {
+    
+}*/
+
+/*
+============
+ParseFile_r
+============
+*/
+static liObj_t *ParseFile_r( scaner_t *s, liflag_t flags, int level ) {
+            
+    liverifya( level <= LI_MAX_NESTING_LEVEL,
+        "error: the nesting level is too high. "
+        "increase the constant LI_MAX_NESTING_LEVEL. "
+        "LI_MAX_NESTING_LEVEL=%d", LI_MAX_NESTING_LEVEL );
+
+    return NULL;
+}
+
+/*
+============
+LiRead
+============
+*/
+licode_t LiRead( liObj_t **o, const char *name ) {
+    liassert(o);
+    return LiReadEx( NULL, o, name, 0, NULL, 0 );
+}
+
+#include <stdio.h>
+#include <stdlib.h>
+/*
+============
+LiReadEx
+============
+*/
+licode_t LiReadEx( liIO_t *io, liObj_t **o, const char *name, 
+                    liflag_t flags, char *errbuf, size_t errbufLen ) {
+    liassert(o);
+    liassert(*o == NULL);
+    liverifya( errbuf && (errbufLen >= 1024) || !errbuf && (errbufLen == 0),
+            "error: the buffer size must be at least 1024" );
+    
+    liFile_t f;
+    licode_t code = LI_OK;
+    scaner_t scaner;
+    
+    if( io == NULL ) {
+        extern liIO_t liDefaultIO;
+        io = &liDefaultIO;
+    }
+    
+    f = io->open( name, 'r' );
+    if( f == NULL ) {
+        return LI_EFILEOPEN;
+    }
+    InitScaner( &scaner, f, io->read, errbuf, errbufLen );
+    *o = ParseFile_r( &scaner, flags, 0 );
+    
+    char buf[1024];
+    size_t rd;
+    FILE *file = fopen( "out.txt", "wb" );
+    
+    do {
+        ssize_t upd = BufferUpdate( &scaner );
+        liassert( upd >= 0 );
+        rd = (size_t)(rand() % 15) + 1;
+        rd = ReadFromBuffer( buf, &scaner, rd );
+        fwrite( buf, 1, rd, file );
+    } while( rd > 0 );
+    liassert( rd >= 0 );
+    
+    fclose( file );
+    
+    FinalScaner( &scaner );
+    io->close( f );
+    
+    return code;
+}
+
