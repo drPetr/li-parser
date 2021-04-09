@@ -25,7 +25,6 @@ typedef uint32_t        liflag_t;
 #define LI_TYID_ARR     3
 
 /* litype (li value type) */
-#define LI_VTUNDEF      0
 #define LI_VTNULL       1
 #define LI_VTOBJ        2
 #define LI_VTSTR        4
