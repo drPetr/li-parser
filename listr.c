@@ -144,7 +144,7 @@ liStr_t *LiSCat( liStr_t *s, const char *cs ) {
 
 /*
 ============
-LiStrConcat
+LiSCatL
 ============
 */
 liStr_t *LiSCatL( liStr_t *s, const char *cs, lisize_t len ) {
@@ -172,10 +172,10 @@ liStr_t *LiSCatL( liStr_t *s, const char *cs, lisize_t len ) {
 LiSCmp
 ============
 */
-int LiSCmp( liStr_t *s, const char *cs ) {
+libool_t LiSCmp( liStr_t *s, const char *cs ) {
     liassert(s);
     liassert(cs);
-    return strcmp( sstr(s), cs );
+    return (strncmp( sstr(s), cs, slen(s) ) == 0) && (cs[slen(s)] == 0);
 }
 
 /*
@@ -183,14 +183,8 @@ int LiSCmp( liStr_t *s, const char *cs ) {
 LiSCmpL
 ============
 */
-int LiSCmpL( liStr_t *s, const char *cs, lisize_t len ) {
+libool_t LiSCmpL( liStr_t *s, const char *cs, lisize_t len ) {
     liassert(s);
     liassert(cs);
-    if( slen(s) == len ) {
-        return strncmp( sstr(s), cs, len );
-    }
-    if( slen(s) > len ) {
-        return sstr(s)[len];
-    }
-    return -cs[slen(s)];
+    return (slen(s) == len) && (strncmp( sstr(s), cs, len ) == 0 );
 }

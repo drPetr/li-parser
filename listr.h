@@ -12,8 +12,6 @@ typedef struct liStr_t {
 } liStr_t;
 
 
-
-
 #define     salc(s)     ((s)->alloced)
 #define     slen(s)     ((s)->length)
 #define     sstr(s)     ((s)->string)
@@ -34,8 +32,8 @@ liStr_t     *LiSSetL( liStr_t *s, const char *cs, lisize_t len );
 liStr_t     *LiSCat( liStr_t *s, const char *cs );
 liStr_t     *LiSCatL( liStr_t *s, const char *cs, lisize_t len );
 
-int         LiSCmp( liStr_t *s, const char *cs );
-int         LiSCmpL( liStr_t *s, const char *cs, lisize_t len );
+libool_t    LiSCmp( liStr_t *s, const char *cs );
+libool_t    LiSCmpL( liStr_t *s, const char *cs, lisize_t len );
 
 
 #endif //__LISTR_H__
