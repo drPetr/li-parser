@@ -39,8 +39,10 @@ typedef uint32_t        liflag_t;
 /* licodes */
 #define LI_OK           ((licode_t)0)
 #define LI_EWRITE       ((licode_t)1)
-#define LI_EINPDAT      ((licode_t)2)
-#define LI_FINISHED     ((licode_t)3)
+#define LI_EREAD        ((licode_t)2)
+#define LI_EFILEOPEN    ((licode_t)3)
+#define LI_EINPDAT      ((licode_t)4)
+#define LI_FINISHED     ((licode_t)5)
 
 /* liflag */
 #define LI_FDEC         0x0000

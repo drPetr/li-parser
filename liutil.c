@@ -8,15 +8,6 @@
 #include <string.h>
 
 
-int Log( const char *fmt, ... ) {
-    int ret;
-    va_list args;
-    va_start( args, fmt );
-    ret = fprintf( stdout, "[log] " );
-    ret += vfprintf( stdout, fmt, args );
-    va_end( args );
-    return ret;
-}
 
 /*
 ============
@@ -313,4 +304,47 @@ MemCpy
 */
 void *MemCpy( void *dst, const void *src, size_t num ) {
     return memcpy( dst, src, num );
+}
+
+/*
+============
+Log
+============
+*/
+int Log( const char *fmt, ... ) {
+    int ret;
+    va_list args;
+    va_start( args, fmt );
+    ret = fprintf( stdout, "[log] " );
+    ret += vfprintf( stdout, fmt, args );
+    va_end( args );
+    return ret;
+}
+
+/*
+============
+SPrint
+============
+*/
+liStr_t *SPrint( liStr_t *s, const char *fmt, ... ) {
+    const uint32_t checkSize = 1024 * 2;
+    if( !s ) {
+        s = LiSAlloc( checkSize + 1024 * 2 );
+    }
+    /* check available free size */
+    if( salc(s) - slen(s) < checkSize ) {
+        s = LiSRealloc( s, salc(s) + checkSize );
+    }
+    
+    va_list args;
+    va_start( args, fmt );
+    
+    int len = vsprintf( sstr(s) + slen(s), fmt, args );
+    liverify(len < checkSize);
+    slen(s) += len;
+    sstr(s)[slen(s)] = 0;
+    
+    va_end( args );
+    
+    return s;
 }
