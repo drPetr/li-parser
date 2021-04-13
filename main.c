@@ -38,7 +38,7 @@
 #define li_bool             LiBool
 
 
-#define li_write            LiWrite
+#define li_write            LiWriteEx
 
 
 
@@ -251,53 +251,13 @@ liobj *MakeExample1( void ) {
     li_ins_last_child( o, mcom( "kb_vote_no", "vote_no" ) );
     li_ins_last_child( o, mcom( "speech_menu_group", "speech_menu_0" ) );
     li_ins_last_child( o, mcom( "speech_menu_personal", "speech_menu_1" ) );
-    
+
     return root;
 }
 
-
 libool_t LiIsCorrectRefStr( const char *s ) ;
 
-/*
-li_inslastchild(  )
-li_insfirstchild
-li_firstchild
-
-LiNext
-LiPrev
-LiParent
-LiFirstChild
-LiLastChild
-
-li_next()
-li_prev()
-li_parent()
-*/
 #include <stdlib.h>
-
-size_t my( uint16_t *str ) {
-    uint64_t himagic = 0x8000800080008000L;
-    uint64_t lomagic = 0x0001000100010001L;
-    uint16_t *longword_ptr = str;
-    
-    for(;;) {
-        uint64_t longword = *longword_ptr++;
-
-        if(((longword - lomagic) & ~longword & himagic) != 0) {
-          
-          uint16_t *cp = (uint16_t *) (longword_ptr - 1);
-
-          if (cp[0] == 0)
-            return cp - str;
-          if (cp[1] == 0)
-            return cp - str + 1;
-          if (cp[2] == 0)
-            return cp - str + 2;
-          if (cp[3] == 0)
-            return cp - str + 3;
-        }
-    }
-}
 
 int main( int argc, char **argv ) {
     clock_t start = clock();
@@ -311,7 +271,7 @@ int main( int argc, char **argv ) {
     clock_t stop = clock();
     double d = (double)(stop - start) / CLOCKS_PER_SEC;
     
-    const char *s = ".keybingidg.group.command.exe";
+    const char *s = ".keybingidg.group.command";
     
     
     printf( "Pattern [%s]\n", s );
@@ -320,20 +280,36 @@ int main( int argc, char **argv ) {
     
     do {
         if( ret == LI_OK ) {
-            if( dat.obj->vstr ) {
-                printf( "found data: %s\n", sstr(dat.obj->vstr) );
+            liFindData_t dat2;
+            ret = LiFindFirst( &dat2, dat.obj, "command.id" );
+            if( ret == LI_OK ) {
+                printf( "[%s] = ", sstr(dat2.obj->vstr) );
             }
+            LiFindClose( &dat2 );
+            ret = LiFindFirst( &dat2, dat.obj, "command.exe" );
+            if( ret == LI_OK ) {
+                printf( "%s", sstr(dat2.obj->vstr) );
+            }
+            printf( "\n" );
+            LiFindClose( &dat2 );
         } else {
             printf( "ret: [%d]\n", ret );
             break;
         }
     } while( (ret = LiFindNext( &dat )) == LI_OK );
+    LiFindClose( &dat );
+    
+    
+    
     
     
     printf( "Loop required %f seconds\n", d );
     
     
     li_free( li );
+    
+    liObj_t *ooo = NULL;
+    LiRead( &ooo, "ignore/system.li" );
     
     return 0;
 }
