@@ -57,6 +57,7 @@ typedef struct {
 
 
 
+
 liObj_t     *LiParent( liObj_t *o );
 liObj_t     *LiNext( liObj_t *o );
 liObj_t     *LiPrev( liObj_t *o );
@@ -78,6 +79,8 @@ liObj_t     *LiExtractSiblings( liObj_t *left, liObj_t *right );
 liObj_t     *LiExtractChildren( liObj_t *node );
 void        LiFreeSubtree( liObj_t *node );
 void        LiFree( liObj_t *li );
+
+
 
 
 void        LiSetKey( liObj_t *o, const char *key );

@@ -1212,191 +1212,216 @@ licode_t LiWriteEx( liIO_t *io, liObj_t *o, const char *name,
 */
 
 typedef struct {
-    char*       begin;      /* beginptr */
-    char*       forward;    /* endptr */
-    size_t      length;     /* available length */
-    int         token;
-    int         line;
-    int         column;
-    
-    char        *beginptr;  /* begin of buffer */
-    char        *endptr;    /* end of buffer */
-    
-    liFile_t    file;
-    fnLiRead    read;
-    liStr_t     *scanBuf;
-    liStr_t     *errPrint;
-    char        *errBuf;
-    size_t      errBufLen;
-} scaner_t;
+    liFile_t    f;
+    fnLiRead    rd;
+    liStr_t     *scanBuf;   /* buffered file data */
+    liStr_t     *errBuf;    
 
-#define l       (s->length)
-#define tk      (s->token)
-#define ln      (s->line)
-#define cl      (s->column)
+    char        *tkBeg;
+    char        *tkFwd;
+    lisize_t    tkLen;
+    int         tk;
+
+    char        *lnBeg;
+    int         ln;
+    int         col;
+} liScan_t;
 
 /*
 ============
-InitScaner
+ScanInit
 ============
 */
-static libool_t InitScaner( scaner_t *s, liFile_t f, fnLiRead rd, 
-        char *errBuf, size_t errBufLen ) {
-    s->length = 0;
-    s->token = 0;
-    s->line = 0;
-    s->column = 0;
-    s->file = f;
-    s->read = rd;
-    s->scanBuf = LiSAlloc( 1024 * 1024 );
-    s->errPrint = NULL;
-    s->errBuf = errBuf;
-    s->errBufLen = errBufLen;
-    s->beginptr = sstr(s->scanBuf);
-    s->endptr = sstr(s->scanBuf);
-    return litrue;
+static void ScanInit( liScan_t *scan, liFile_t f, fnLiRead rd ) {
+    scan->f = f;
+    scan->rd = rd;
+    scan->scanBuf = LiSAlloc( 1024 );
+    scan->errBuf = NULL;    
+
+    scan->tkBeg = sstr(scan->scanBuf);
+    scan->tkFwd = sstr(scan->scanBuf);
+    scan->tkLen = 0;
+    scan->tk = 0;
+
+    scan->lnBeg = sstr(scan->scanBuf);
+    scan->ln = 1;
+    scan->col = 1;
 }
 
 /*
 ============
-FinalScaner
+ScanFree
 ============
 */
-static void FinalScaner( scaner_t *s ) {
-    /* copy error message to the error buffer */
-    if( s->errBuf ) {
-        if( s->errPrint ) {
-            lisize_t min = slen(s->errPrint) < s->errBufLen - 1 ?
-                    slen(s->errPrint) : s->errBufLen - 1;
-            MemCpy( s->errBuf, sstr(s->errPrint), min );
-            s->errBuf[min] = 0;
+static void ScanFree( liScan_t *scan ) {
+    if( scan->scanBuf ) {
+        LiSFree( scan->scanBuf );
+    }
+    if( scan->errBuf ) {
+        LiSFree( scan->errBuf );
+    }
+}
+
+
+#define tb      (scan->tkBeg)
+#define tf      (scan->tkFwd)
+#define tl      (scan->tkLen)
+#define tk      (scan->tk)
+#define lb      (scan->lnBeg)
+#define ln      (scan->ln)
+#define lc      (scan->col)
+
+/*
+============
+UpdateBuffer
+============
+*/
+static ssize_t UpdateBuffer( liScan_t *scan ) {
+    char *min;
+    if( lb < tb ) {
+        if( (size_t)(tb - lb) > 64 ) {
+            lb = tb - 64;
         }
+        min = lb;
+    } else {
+        min = tb;
+    }
+    ssize_t left = min - sstr(scan->scanBuf);
+    ssize_t right = salc(scan->scanBuf) - slen(scan->scanBuf);
+    
+    liassert( left >= 0 );
+    liassert( right >= 0 );
+    
+    Log( "update l[%d] r[%d]\n", (int)left, (int)right );
+    
+    if( left ) {
+        ssize_t siz = slen(scan->scanBuf) - left;
+        liassert( siz > 0 );
+        MemCpy( sstr(scan->scanBuf), min, siz );
+        tb -= left;
+        tf -= left;
+        lb -= left;
+        slen(scan->scanBuf) -= left;
+        right += left;
     }
     
-    /* free buffers */
-    if( s->scanBuf ) {
-        LiSFree( s->scanBuf );
+    if( right ) {
+        char *to = sstr(scan->scanBuf) + slen(scan->scanBuf);
+        ssize_t rsiz = scan->rd( to, right, scan->f );
+        if( rsiz < 0 ) {
+            return rsiz;
+        }
+        slen(scan->scanBuf) += rsiz;
+        liassert( slen(scan->scanBuf) <= salc(scan->scanBuf) );
+        return rsiz;
     }
-    if( s->errPrint ) {
-        LiSFree( s->errPrint );
-    }
+    
+    return 0;
 }
+
+#define CH_EOB  0x7f100000
+#define CH_EOF  0x7f200000
+#define CH_ERD  0x7f300000
 
 /*
 ============
-BufferUpdate
+GetChar
 ============
 */
-static ssize_t BufferUpdate( scaner_t *s ) {
-    ssize_t ret1 = 0, ret2 = 0;
-    fnLiRead read = s->read;
-    char *beg = s->beginptr;
-    char *end = s->endptr;
-    char *buf = sstr(s->scanBuf);
-    char *eob = buf + salc(s->scanBuf) - 1;
-    liFile_t fp = s->file;
-    
-    if( beg <= end ) {
-        size_t siz1 = (size_t)(eob - end);
-        size_t siz2 = (size_t)(beg - buf);
-        
-        /* read first part */
-        if( siz1 ) {
-            ret1 = read( end, siz1, fp );
-            if( ret1 < 0 ) {
-                return ret1;
+int GetChar( liScan_t *scan ) {
+    if( tf >= sstr(scan->scanBuf) + slen(scan->scanBuf) ) {
+        ssize_t rsiz = UpdateBuffer( scan );
+        if( rsiz < 0 ) {
+            /* return reading error */
+            return CH_ERD;
+        }
+        if( rsiz == 0 ) {
+            /* return end of file */
+            if( salc(scan->scanBuf) == slen(scan->scanBuf) ) {
+                return CH_EOB;
             }
-            end += ret1;
-        }
-        
-        /* read second part */
-        if( siz2 && (eob == end) ) {
-            ret2 = read( buf, siz2, fp );
-            if( ret2 < 0 ) {
-                return ret2;
-            } else if( ret2 > 0 ) {
-                end = buf + ret2 - 1;
-            }
-        }
-    } else { /* beg > end */
-        size_t siz = (size_t)(beg - end - 1);
-        if( siz ) {
-            ret1 = read( end, siz, fp );
-            if( ret1 < 0 ) {
-                return ret1;
-            }
-            end += ret1;
+            return CH_EOF;
         }
     }
-    
-    /* save values to the scaner */
-    s->endptr = end;
-    
-    liassert( beg < eob );
-    liassert( end < eob );
-    liassert( beg >= buf );
-    liassert( end >= buf );
-    
-    return ret1 + ret2;
-}
-
-static size_t ReadFromBuffer( char *dst, scaner_t *s, size_t size ) {
-    size_t siz1 = 0, siz2 = 0, min;
-    char *beg = s->beginptr;
-    char *end = s->endptr;
-    char *buf = sstr(s->scanBuf);
-    char *eob = buf + salc(s->scanBuf) - 1;
-    
-    if( beg <= end ) {
-        siz1 = (size_t)(end - beg);
-        min = siz1 < size ? siz1 : size;
-        MemCpy( dst, beg, min );
-        s->beginptr += min;
-    } else { /* beg > end */
-        siz1 = (size_t)(eob - beg + 1);
-        siz2 = (size_t)(beg - end);
-        min = siz1 < size ? siz1 : size;
-        if( min ) {
-            MemCpy( dst, beg, min );
-            size -= min;
-            dst += min;
-            s->beginptr += min;
-        }
-        min = siz2 < size ? siz2 : size;
-        if( min ) {
-            MemCpy( dst, buf, min );
-            size -= min;
-            s->beginptr = buf + min;
-        }
+    if( *tf == '\n' ) {
+        ln++;
+        lc = 1;
+        lb = tf + 1;
+    } else {
+        lc++;
     }
-    
-    return siz1 + siz2;
+    liassert( tf <= sstr(scan->scanBuf) + slen(scan->scanBuf) );
+    return *tf;
 }
 
-/*static char GetBufferChar( scaner_t *s ) {
-    
-}
-
-*/
 /*
-static liStr_t *UpdateScanBuffer( liFile_t f, fnLiRead rd, liStr_t *buf ) {
-    
+============
+GetNextChar
+============
+*/
+int GetNextChar( liScan_t *scan ) {
+    tf++;
+    return GetChar( scan );
 }
 
-static void ParseStateInit( liFile_t f, fnLiRead rd ) {
+/*
+============
+ReadBufData
+============
+*/
+liStr_t *ReadBufData( liStr_t *s, liScan_t *scan ) {
+    if( lb < tb ) {
+        if( (size_t)(tb - lb) > 64 ) {
+            lb = tb - 64;
+        }
+    }
     
+    if( s ) {
+        s = LiSCatL( s, tb, tl );
+    } else {
+        s = LiSNewL( tb, tl );
+    }
+    tb = tf;
+    tl = 0;
+    
+    return s;
 }
 
-static void ParseStateFinal() {
-    
+/*
+void SkipWhiteSpace( scaner_t *s );
+void SetBegin();*/
+
+
+
+#define TK_EREAD    -1
+#define TK_EOF      0
+
+
+
+/*
+============
+ScanNextToken
+============
+*/
+/*static int ScanNextToken( scaner_t *s ) { 
+
+
 }*/
+
+#undef tb
+#undef tf
+#undef tl
+#undef tk
+#undef lb
+#undef ln
+#undef lc
 
 /*
 ============
 ParseFile_r
 ============
 */
-static liObj_t *ParseFile_r( scaner_t *s, liflag_t flags, int level ) {
+static liObj_t *ParseFile_r( liScan_t *scan, liflag_t flags, int level ) {
             
     liverifya( level <= LI_MAX_NESTING_LEVEL,
         "error: the nesting level is too high. "
@@ -1427,12 +1452,13 @@ licode_t LiReadEx( liIO_t *io, liObj_t **o, const char *name,
                     liflag_t flags, char *errbuf, size_t errbufLen ) {
     liassert(o);
     liassert(*o == NULL);
-    liverifya( errbuf && (errbufLen >= 1024) || !errbuf && (errbufLen == 0),
+    liverifya( (errbuf && (errbufLen >= 1024)) || 
+            (!errbuf && (errbufLen == 0)),
             "error: the buffer size must be at least 1024" );
     
     liFile_t f;
     licode_t code = LI_OK;
-    scaner_t scaner;
+    liScan_t scan;
     
     if( io == NULL ) {
         extern liIO_t liDefaultIO;
@@ -1443,25 +1469,42 @@ licode_t LiReadEx( liIO_t *io, liObj_t **o, const char *name,
     if( f == NULL ) {
         return LI_EFILEOPEN;
     }
-    InitScaner( &scaner, f, io->read, errbuf, errbufLen );
-    *o = ParseFile_r( &scaner, flags, 0 );
+    ScanInit( &scan, f, io->read );
+    *o = ParseFile_r( &scan, flags, 0 );
     
-    char buf[1024];
+    
     size_t rd;
     FILE *file = fopen( "out.txt", "wb" );
     
-    do {
-        ssize_t upd = BufferUpdate( &scaner );
-        liassert( upd >= 0 );
-        rd = (size_t)(rand() % 15) + 1;
-        rd = ReadFromBuffer( buf, &scaner, rd );
-        fwrite( buf, 1, rd, file );
-    } while( rd > 0 );
-    liassert( rd >= 0 );
+    liStr_t *s = NULL;
+    int ch = GetChar( &scan );
+    char *prev = scan.tkBeg;
+    while( ch != CH_EOF && ch != CH_ERD ) {
+        if( ch == CH_EOB ) {
+            s = ReadBufData( s, &scan );
+            ch = GetChar( &scan );
+            continue;
+        }
+        
+        scan.tkLen++;
+        char c = (char)ch;
+        fwrite( &c, 1, 1, file );
+        ch = GetNextChar( &scan );
+    }
+    
+    if( ch == CH_EOF ) {
+        Log( "EOF\n" );
+    } else if( ch == CH_ERD ) {
+        Log( "ERD\n" );
+    }
+    
+    s = ReadBufData( s, &scan );
+    
+    LiSFree(s);
     
     fclose( file );
     
-    FinalScaner( &scaner );
+    ScanFree( &scan );
     io->close( f );
     
     return code;

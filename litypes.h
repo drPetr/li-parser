@@ -23,6 +23,7 @@ typedef uint32_t        liflag_t;
 #define LI_TYID_STR     1
 #define LI_TYID_NODE    2
 #define LI_TYID_ARR     3
+#define LI_TYID_BUF     3
 
 /* litype (li value type) */
 #define LI_VTNULL       1

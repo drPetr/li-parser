@@ -23,6 +23,7 @@ typedef struct {
     char            array_[0];   /* array */
 } liArray_t;
 
+
 #define     aalc(a)     ((a)->allocedNum)
 #define     asiz(a)     ((a)->sizOfElem)
 #define     anum(a)     ((a)->number)
