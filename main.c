@@ -259,18 +259,6 @@ libool_t LiIsCorrectRefStr( const char *s ) ;
 
 #include <stdlib.h>
 
-#define CH_EOF  0x7f0f0f0f
-
-ssize_t UpdateBuffer();
-
-void SkipWhiteSpace();
-void SetBegin();
-int GetChar();
-int GetNextChar();
-
-
-
-
 int main( int argc, char **argv ) {
     clock_t start = clock();
     
