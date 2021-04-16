@@ -1225,6 +1225,10 @@ typedef struct {
     char        *lnBeg;
     int         ln;
     int         col;
+    
+    liStr_t     *storage;
+    
+    libool_t    chProc;     /* char processed */
 } liScan_t;
 
 /*
@@ -1246,6 +1250,10 @@ static void ScanInit( liScan_t *scan, liFile_t f, fnLiRead rd ) {
     scan->lnBeg = sstr(scan->scanBuf);
     scan->ln = 1;
     scan->col = 1;
+    
+    scan->storage = NULL;
+    
+    scan->chProc = lifalse;
 }
 
 /*
@@ -1292,8 +1300,6 @@ static ssize_t UpdateBuffer( liScan_t *scan ) {
     liassert( left >= 0 );
     liassert( right >= 0 );
     
-    Log( "update l[%d] r[%d]\n", (int)left, (int)right );
-    
     if( left ) {
         ssize_t siz = slen(scan->scanBuf) - left;
         liassert( siz > 0 );
@@ -1319,16 +1325,36 @@ static ssize_t UpdateBuffer( liScan_t *scan ) {
     return 0;
 }
 
-#define CH_EOB  0x7f100000
-#define CH_EOF  0x7f200000
-#define CH_ERD  0x7f300000
+/*
+============
+StoreBufData
+============
+*/
+static void StoreBufData( liScan_t *scan ) {
+    if( lb < tb ) {
+        if( (size_t)(tb - lb) > 64 ) {
+            lb = tb - 64;
+        }
+    }
+    
+    if( scan->storage ) {
+        scan->storage = LiSCatL( scan->storage, tb, tl );
+    } else {
+        scan->storage = LiSNewL( tb, tl );
+    }
+    tb = tf;
+    tl = 0;
+}
+
+#define CH_EOF  0x7f100000
+#define CH_ERD  0x7f200000
 
 /*
 ============
 GetChar
 ============
 */
-int GetChar( liScan_t *scan ) {
+static int GetChar( liScan_t *scan ) {
     if( tf >= sstr(scan->scanBuf) + slen(scan->scanBuf) ) {
         ssize_t rsiz = UpdateBuffer( scan );
         if( rsiz < 0 ) {
@@ -1336,19 +1362,29 @@ int GetChar( liScan_t *scan ) {
             return CH_ERD;
         }
         if( rsiz == 0 ) {
-            /* return end of file */
             if( salc(scan->scanBuf) == slen(scan->scanBuf) ) {
-                return CH_EOB;
+                /* end of buffer */
+                StoreBufData( scan );
+                static int lvl = 0;   /* recursion level */
+                lvl++;
+                liassert( lvl <= 2 ); /* check recursion level */
+                int ch = GetChar( scan );
+                lvl--;
+                return ch;
             }
+            /* return end of file */
             return CH_EOF;
         }
     }
-    if( *tf == '\n' ) {
-        ln++;
-        lc = 1;
-        lb = tf + 1;
-    } else {
-        lc++;
+    if( !scan->chProc ) {
+        if( *tf == '\n' ) {
+            ln++;
+            lc = 1;
+            lb = tf + 1;
+        } else {
+            lc++;
+        }
+        scan->chProc = litrue;
     }
     liassert( tf <= sstr(scan->scanBuf) + slen(scan->scanBuf) );
     return *tf;
@@ -1359,54 +1395,156 @@ int GetChar( liScan_t *scan ) {
 GetNextChar
 ============
 */
-int GetNextChar( liScan_t *scan ) {
+static int GetNextChar( liScan_t *scan ) {
     tf++;
+    scan->chProc = lifalse;
     return GetChar( scan );
 }
 
+
+
+#define TK_ERD      0x80000000
+#define TK_EOF      0x71000000
+#define TK_STR      0x72000000
+#define TK_KEY      0x73000000
+#define TK_ERR      0x74000000
+#define TK_NUM      0x75000000
+
 /*
 ============
-ReadBufData
+ScanKeyword
 ============
 */
-liStr_t *ReadBufData( liStr_t *s, liScan_t *scan ) {
-    if( lb < tb ) {
-        if( (size_t)(tb - lb) > 64 ) {
-            lb = tb - 64;
-        }
-    }
-    
-    if( s ) {
-        s = LiSCatL( s, tb, tl );
-    } else {
-        s = LiSNewL( tb, tl );
-    }
+static int ScanKeyword( liScan_t *scan ) {
+    int ch = GetChar( scan );
+    liassert( is_firstkeych( (char)ch ) );
     tb = tf;
-    tl = 0;
-    
-    return s;
+    tl = 1;
+    while( 1 ) {
+        ch = GetNextChar( scan );
+        if( !is_nextkeych( (char)ch ) ) {
+            break;
+        }
+        tl++;
+    }
+    /* store string to storage and return */
+    StoreBufData( scan );
+    return TK_KEY;
 }
 
 /*
-void SkipWhiteSpace( scaner_t *s );
-void SetBegin();*/
+============
+ScanNumber
 
-
-
-#define TK_EREAD    -1
-#define TK_EOF      0
-
-
+0x123123        hex (int)
+0123            oct (int)
+[+/-]123123     dec (int)
+[+/-]123.123        (double)
+[+/-](nan/inf/inf)  (double)
+[+/-]1e[+/-]12           (double)
+[+/-](0-9)[.(0-9)]
+============
+*/
+static int ScanNumber( liScan_t *scan ) {
+    int ch = GetChar( scan );
+    /* if( ch >= '0' && ch <= '9' || ch == '-' || ch == '+' ) {
+    */
+    return TK_NUM;
+}
 
 /*
 ============
-ScanNextToken
+ScanString
+
+"string... \t ...string... \n \t \a" ...
 ============
 */
-/*static int ScanNextToken( scaner_t *s ) { 
+static int ScanString( liScan_t *scan ) {
+    int ch = GetChar( scan );
+    liassert( ch == '"' );
+    tb = tf;
+    tl = 0;
+    while( 1 ) {
+        ch = GetNextChar( scan );
+        if( ch == '"' ) {
+            /* check for end of string character */
+            break;
+        } else if( ch == '\\' ) {
+            /* escape character */
+            tl++;
+            ch = GetNextChar( scan );
+            if( !(ch >= 32 && ch <= 255 && ch != 127) ) {
+                /* not printable character */
+                /* TODO error message */
+                goto goErr;
+            }
+        } else if( ch >= 32 && ch <= 255 && ch != 127 ) {
+            /* if character is printable */
+        } else {
+            /* handle as error */
+            /* check for special characters */
+            if( ch == CH_EOF ) {
+                /* TODO error message */
+                goto goErr;
+            } else if( ch == CH_ERD ) {
+                /* TODO error message */
+                goto goErr;
+            } else {
+                liasserta( 0, "unknown character" );
+            }
+        }
+        tl++;
+    }
+    /* skip current char '"' */
+    GetNextChar( scan );
+    /* store string to storage */
+    StoreBufData( scan );
+    return TK_STR;
+goErr:
+    tb = tf;
+    tl = 0;
+    return TK_ERR;
+}
 
-
-}*/
+/*
+============
+ScanToken
+============
+*/
+static int ScanToken( liScan_t *scan ) { 
+    int ch = GetChar( scan );
+    tl = 0;
+    while( 1 ) {
+        tb = tf;
+        switch( ch ) {
+            case CH_EOF:
+                /* end of file */
+                return tk = TK_EOF;
+            case CH_ERD:
+                /* reading error */
+                return tk = TK_ERD;
+            case ' ': case '\t': case '\n': case '\v': case '\f': case '\r':
+                /* skip space character */
+                break;
+            case '"':
+                return tk = ScanString( scan );
+            default:
+                /* check for keyword */
+                if( is_firstkeych( (char)ch ) ) {
+                    return tk = ScanKeyword( scan );
+                }
+                /* check for number */
+                if( (ch >= '0' && ch <= '9') || (ch == '-') || (ch == '+') ){
+                    return tk = ScanNumber( scan );
+                }
+                /* return character as token */
+                tk = ch;
+                GetNextChar( scan );
+                return tk;
+        }
+        ch = GetNextChar( scan );
+    }
+}
 
 #undef tb
 #undef tf
@@ -1480,12 +1618,6 @@ licode_t LiReadEx( liIO_t *io, liObj_t **o, const char *name,
     int ch = GetChar( &scan );
     char *prev = scan.tkBeg;
     while( ch != CH_EOF && ch != CH_ERD ) {
-        if( ch == CH_EOB ) {
-            s = ReadBufData( s, &scan );
-            ch = GetChar( &scan );
-            continue;
-        }
-        
         scan.tkLen++;
         char c = (char)ch;
         fwrite( &c, 1, 1, file );
@@ -1493,12 +1625,13 @@ licode_t LiReadEx( liIO_t *io, liObj_t **o, const char *name,
     }
     
     if( ch == CH_EOF ) {
-        Log( "EOF\n" );
+        Log( "CH_EOF\n" );
     } else if( ch == CH_ERD ) {
-        Log( "ERD\n" );
+        Log( "CH_ERD\n" );
     }
     
-    s = ReadBufData( s, &scan );
+    s = scan.storage;
+    scan.storage = NULL;
     
     LiSFree(s);
     
